@@ -166,7 +166,7 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
     const unsubTextDelta = ipcClient.onTextDelta((event: TextDeltaEvent) => {
       if (event.sessionId !== sessionId) return
       
-      streamBufferRef.current += event.text
+      streamBufferRef.current += event.delta
       flushStreamBufferRef.current()
     })
 
@@ -174,7 +174,7 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
     const unsubThinkingDelta = ipcClient.onThinkingDelta((event: ThinkingDeltaEvent) => {
       if (event.sessionId !== sessionId) return
       
-      streamThinkingBufferRef.current += event.thinking
+      streamThinkingBufferRef.current += event.delta
       flushStreamBufferRef.current()
     })
 
@@ -236,9 +236,9 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
             if (tc.id === event.toolCallId) {
               return {
                 ...tc,
-                status: event.error ? 'error' as const : 'success' as const,
+                status: event.isError ? 'error' as const : 'success' as const,
                 result: event.result,
-                error: event.error,
+                error: event.isError ? event.result : undefined,
                 endTime: new Date(),
               }
             }

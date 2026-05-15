@@ -24,7 +24,6 @@ export function ChatPage() {
   
   const { 
     messages, 
-    isLoading, 
     isStreaming, 
     sendMessage, 
     abortMessage 
@@ -91,7 +90,6 @@ export function ChatPage() {
           <ChatArea
             messages={messages}
             isStreaming={isStreaming}
-            isLoading={isLoading}
             currentModel={currentModel}
             models={models}
             onSend={sendMessage}

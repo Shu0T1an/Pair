@@ -119,7 +119,7 @@ export function MessageGroup({ role, messages, modelName, showTimestamp }: Messa
                   {/* 正文内容 */}
                   {hasContent ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <MemoizedMarkdown content={message.content} isStreaming={isStreamingMsg} />
+                      <MemoizedMarkdown content={message.content} />
                     </div>
                   ) : isStreamingMsg && !hasThinking && !hasToolCalls ? (
                     null

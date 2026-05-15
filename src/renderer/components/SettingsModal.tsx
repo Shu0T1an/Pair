@@ -23,8 +23,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { cn } from '@/renderer/lib/utils'
-import { AddModelModal } from './AddModelModal'
-import { EditModelModal } from './EditModelModal'
+import { ModelModal } from './modals/ModelModal'
 import { useModelContext, type ModelConfig } from '@/renderer/contexts/ModelContext'
 import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
 
@@ -40,6 +39,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isAddModelOpen, setIsAddModelOpen] = useState(false)
   const [isEditModelOpen, setIsEditModelOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<ModelConfig | null>(null)
+  const { addModelConfig, updateModelConfig } = useModelContext()
 
   const handleEditConfig = (config: ModelConfig) => {
     setEditingConfig(config)
@@ -126,19 +126,29 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       </div>
 
       {/* 添加模型弹窗 */}
-      <AddModelModal
+      <ModelModal
         isOpen={isAddModelOpen}
         onClose={() => setIsAddModelOpen(false)}
+        mode="add"
+        onSave={async (config) => {
+          await addModelConfig(config)
+        }}
       />
 
       {/* 编辑模型弹窗 */}
-      <EditModelModal
+      <ModelModal
         isOpen={isEditModelOpen}
         onClose={() => {
           setIsEditModelOpen(false)
           setEditingConfig(null)
         }}
-        config={editingConfig}
+        mode="edit"
+        initialConfig={editingConfig || undefined}
+        onSave={async (config) => {
+          if (editingConfig) {
+            await updateModelConfig(editingConfig.id, config)
+          }
+        }}
       />
     </div>
   )

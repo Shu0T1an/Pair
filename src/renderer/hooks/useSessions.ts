@@ -47,9 +47,9 @@ export function useSessions() {
   }, [])
 
   // 创建会话
-  const createSession = useCallback(async (projectPath?: string, model?: string): Promise<SessionInfo | null> => {
+  const createSession = useCallback(async (projectPath?: string, modelId?: string): Promise<SessionInfo | null> => {
     try {
-      const session = await ipcClient.createSession(projectPath, model)
+      const session = await ipcClient.createSession({ projectPath: projectPath || '', modelId })
       await loadSessions()
       return session
     } catch (error) {
@@ -77,7 +77,7 @@ export function useSessions() {
   // 重命名会话
   const renameSession = useCallback(async (sessionId: string, newName: string) => {
     try {
-      await ipcClient.renameSession(sessionId, newName)
+      await ipcClient.updateSession(sessionId, { name: newName })
       await loadSessions()
     } catch (error) {
       console.error('重命名会话失败:', error)
