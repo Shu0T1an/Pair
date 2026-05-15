@@ -65,6 +65,7 @@ export interface ModelInfo {
   name: string;
   provider: string;
   description?: string;
+  contextWindow?: number;  // 上下文窗口大小
 }
 
 // 应用设置

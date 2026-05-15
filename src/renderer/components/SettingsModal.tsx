@@ -27,7 +27,7 @@ import { cn } from '@/renderer/lib/utils'
 import { ModelModal } from './modals/ModelModal'
 import { useModelContext, type ModelConfig } from '@/renderer/contexts/ModelContext'
 import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
-import { useTheme, themes, type ThemeName, fontSizeMap, type FontSize } from '@/renderer/contexts/ThemeContext'
+import { useTheme, themes, fontSizeMap, type FontSize } from '@/renderer/contexts/ThemeContext'
 
 type SettingsTab = 'general' | 'model' | 'message' | 'appearance' | 'about'
 

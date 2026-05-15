@@ -95,6 +95,9 @@ export class IPCHandler {
     // 对话框
     ipcMain.handle('dialog:selectFolder', this.handleSelectFolder.bind(this));
     
+    // 上下文使用情况
+    ipcMain.handle('context:usage', this.handleGetContextUsage.bind(this));
+    
     // 窗口控制
     ipcMain.handle('window:minimize', this.handleMinimize.bind(this));
     ipcMain.handle('window:maximize', this.handleMaximize.bind(this));
@@ -317,6 +320,18 @@ export class IPCHandler {
   }
 
   /**
+   * 获取上下文使用情况
+   */
+  private handleGetContextUsage(_event: any, sessionId: string): any {
+    try {
+      return this.agentManager.getContextUsage(sessionId);
+    } catch (error) {
+      console.error('获取上下文使用情况失败:', error);
+      return { usedTokens: 0, totalTokens: 128000, percentage: 0 };
+    }
+  }
+
+  /**
    * 最小化窗口
    */
   private handleMinimize() {
@@ -442,6 +457,7 @@ export class IPCHandler {
     ipcMain.removeHandler('model:removeApiKey');
     ipcMain.removeHandler('model:syncConfig');
     ipcMain.removeHandler('model:removeConfig');
+    ipcMain.removeHandler('context:usage');
     ipcMain.removeHandler('window:minimize');
     ipcMain.removeHandler('window:maximize');
     ipcMain.removeHandler('window:close');

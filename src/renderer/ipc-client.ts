@@ -106,7 +106,7 @@ interface ElectronAPI {
 
   // 消息处理
   message: {
-    send: (sessionId: string, text: string, modelConfig?: string | { provider: string; baseUrl: string; apiKey: string; modelId: string; modelName?: string; api?: string }) => Promise<void>;
+    send: (sessionId: string, text: string, modelConfig?: string | { provider: string; baseUrl: string; apiKey: string; modelId: string; modelName?: string; api?: string; contextWindow?: number }) => Promise<void>;
     abort: (sessionId: string) => Promise<void>;
   };
 
@@ -114,7 +114,7 @@ interface ElectronAPI {
   model: {
     list: () => Promise<any[]>;
     current: (sessionId: string) => Promise<string | undefined>;
-    set: (sessionId: string, modelId: string, modelConfig?: string | { provider: string; baseUrl: string; apiKey: string; modelId: string; modelName?: string; api?: string }) => Promise<void>;
+    set: (sessionId: string, modelId: string, modelConfig?: string | { provider: string; baseUrl: string; apiKey: string; modelId: string; modelName?: string; api?: string; contextWindow?: number }) => Promise<void>;
     testConnection: (options: { provider: string; baseUrl: string; apiKey: string }) => Promise<{ success: boolean; error?: string }>;
     setApiKey: (provider: string, apiKey: string) => Promise<void>;
     removeApiKey: (provider: string) => Promise<void>;
@@ -124,6 +124,11 @@ interface ElectronAPI {
 
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => () => void;
+
+  // 上下文使用情况
+  context: {
+    usage: (sessionId: string) => Promise<{ usedTokens: number; totalTokens: number; percentage: number }>;
+  };
 }
 
 // 声明全局变量
@@ -258,6 +263,7 @@ export class IPCClient {
       modelId: string;
       modelName?: string;
       api?: string;
+      contextWindow?: number;
     }
   ): Promise<void> {
     if (!this.isElectron()) {
@@ -318,6 +324,7 @@ export class IPCClient {
       modelId: string;
       modelName?: string;
       api?: string;
+      contextWindow?: number;
     }
   ): Promise<void> {
     if (!this.isElectron()) {
@@ -391,6 +398,17 @@ export class IPCClient {
       return;
     }
     return window.electronAPI.model.removeConfig(provider);
+  }
+
+  /**
+   * 获取上下文使用情况
+   */
+  async getContextUsage(sessionId: string): Promise<{ usedTokens: number; totalTokens: number; percentage: number }> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，返回模拟数据');
+      return { usedTokens: 0, totalTokens: 128000, percentage: 0 };
+    }
+    return window.electronAPI.context.usage(sessionId);
   }
 
   // 便捷事件监听方法

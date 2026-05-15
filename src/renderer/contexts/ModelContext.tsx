@@ -9,6 +9,7 @@ export interface ModelConfig {
   api: string  // API 类型: 'openai-completions' | 'anthropic-messages' | 'google-generative-ai'
   isEnabled: boolean
   enabledModels: string[]
+  contextWindow?: number  // 上下文窗口大小（tokens）
   createdAt: Date
 }
 

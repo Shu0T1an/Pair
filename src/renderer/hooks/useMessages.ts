@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Message } from '@/shared/types'
 import { ipcClient } from '@/renderer/ipc-client'
+import type { ModelConfig } from '@/renderer/contexts/ModelContext'
 import type { 
   TextDeltaEvent, 
   ThinkingDeltaEvent, 
@@ -31,9 +32,11 @@ function toolResultToString(result: unknown): string {
 interface UseMessagesOptions {
   sessionId: string | null
   messagesCache: Map<string, Message[]>
+  currentModelId?: string
+  modelConfigs?: ModelConfig[]  // 自定义模型配置列表
 }
 
-export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
+export function useMessages({ sessionId, messagesCache, currentModelId, modelConfigs }: UseMessagesOptions) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -130,12 +133,33 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
     setIsStreaming(true)
     
     try {
-      await ipcClient.sendMessage(sessionId, text)
+      // 如果当前模型有对应的项目配置，传完整配置对象（走 createCustomModel 路径）
+      // 模型列表来自 ModelContext（localStorage），同源保证总能找到匹配的配置
+      if (currentModelId && modelConfigs) {
+        const matchedConfig = modelConfigs.find(c => c.enabledModels.includes(currentModelId))
+        if (matchedConfig) {
+          await ipcClient.sendMessage(sessionId, text, {
+            provider: matchedConfig.provider,
+            baseUrl: matchedConfig.baseUrl,
+            apiKey: matchedConfig.apiKey,
+            modelId: currentModelId,
+            modelName: currentModelId,
+            api: matchedConfig.api,
+            contextWindow: matchedConfig.contextWindow,
+          })
+        } else {
+          // 模型不在项目配置中，不传 modelConfig，使用会话当前模型
+          await ipcClient.sendMessage(sessionId, text)
+        }
+      } else {
+        // 没有模型 ID，直接发送
+        await ipcClient.sendMessage(sessionId, text)
+      }
     } catch (error) {
       console.error('发送消息失败:', error)
       setIsStreaming(false)
     }
-  }, [sessionId])
+  }, [sessionId, currentModelId, modelConfigs])
 
   // 中止消息
   const abortMessage = useCallback(async () => {

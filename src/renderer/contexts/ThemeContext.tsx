@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 
 // 主题类型定义
-export type ThemeName = 'default' | 'blue' | 'green' | 'purple' | 'warm' | 'dark'
+export type ThemeName = 'default' | 'blue' | 'green' | 'purple' | 'warm' | 'dark' | 'white'
 
 export interface ThemeColors {
   name: ThemeName
@@ -25,12 +25,12 @@ export const themes: ThemeColors[] = [
       '--border': '0 0% 92%',
       '--input': '0 0% 97%',
       '--ring': '0 0% 10%',
-      '--primary': '0 0% 10%',
+      '--primary': '0 0% 25%',
       '--primary-foreground': '0 0% 100%',
       '--secondary': '0 0% 98%',
       '--secondary-foreground': '0 0% 10%',
-      '--accent': '0 0% 10%',
-      '--accent-foreground': '0 0% 100%',
+      '--accent': '0 0% 90%',
+      '--accent-foreground': '0 0% 15%',
       '--card': '0 0% 100%',
       '--card-foreground': '0 0% 15%',
       '--sidebar': '0 0% 98%',
@@ -68,12 +68,12 @@ export const themes: ThemeColors[] = [
       '--border': '0 0% 90%',
       '--input': '0 0% 94%',
       '--ring': '0 0% 10%',
-      '--primary': '0 0% 10%',
+      '--primary': '0 0% 25%',
       '--primary-foreground': '0 0% 100%',
       '--secondary': '0 0% 100%',
       '--secondary-foreground': '0 0% 10%',
-      '--accent': '0 0% 10%',
-      '--accent-foreground': '0 0% 100%',
+      '--accent': '0 0% 90%',
+      '--accent-foreground': '0 0% 20%',
       '--card': '0 0% 100%',
       '--card-foreground': '0 0% 20%',
       '--sidebar': '0 0% 93%',

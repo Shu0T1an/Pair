@@ -64,6 +64,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
   },
 
+  // 上下文使用情况
+  context: {
+    usage: (sessionId: string) => ipcRenderer.invoke('context:usage', sessionId),
+  },
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = [

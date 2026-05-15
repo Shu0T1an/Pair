@@ -37,11 +37,16 @@ export function useModels() {
       const contextModels = getEnabledModels()
       
       if (contextModels.length > 0) {
-        const modelInfos: ModelInfo[] = contextModels.map(m => ({
-          id: m.id,
-          name: m.name,
-          provider: m.provider,
-        }))
+        const modelInfos: ModelInfo[] = contextModels.map(m => {
+          // 从 modelConfigs 中查找对应的配置
+          const config = modelConfigs.find(c => c.provider === m.provider);
+          return {
+            id: m.id,
+            name: m.name,
+            provider: m.provider,
+            contextWindow: config?.contextWindow,
+          };
+        })
         setModels(modelInfos)
         
         // 如果当前模型不在列表中，选择第一个
@@ -55,7 +60,7 @@ export function useModels() {
       console.error('加载模型列表失败:', error)
       setModels([])
     }
-  }, [getEnabledModels, currentModelId])
+  }, [getEnabledModels, currentModelId, modelConfigs])
 
   // 切换模型
   const selectModel = useCallback((modelId: string) => {
@@ -68,11 +73,16 @@ export function useModels() {
     const contextModels = getEnabledModels()
     
     if (contextModels.length > 0) {
-      const modelInfos: ModelInfo[] = contextModels.map(m => ({
-        id: m.id,
-        name: m.name,
-        provider: m.provider,
-      }))
+      const modelInfos: ModelInfo[] = contextModels.map(m => {
+        // 从 modelConfigs 中查找对应的配置
+        const config = modelConfigs.find(c => c.provider === m.provider);
+        return {
+          id: m.id,
+          name: m.name,
+          provider: m.provider,
+          contextWindow: config?.contextWindow,
+        };
+      })
       setModels(modelInfos)
       
       // 如果当前模型不在列表中，选择第一个

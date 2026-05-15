@@ -8,6 +8,7 @@ import { useSessions } from '@/renderer/hooks/useSessions'
 import { useMessages } from '@/renderer/hooks/useMessages'
 import { useModels } from '@/renderer/hooks/useModels'
 import { useTheme } from '@/renderer/contexts/ThemeContext'
+import { useModelContext } from '@/renderer/contexts/ModelContext'
 
 export function ChatPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -20,33 +21,40 @@ export function ChatPage() {
     selectSession, 
     createSession,
     deleteSession,
-    deleteAllSessions,
     deleteAllSessionsInProject,
     renameSession,
     getMessagesCache 
   } = useSessions()
   
   const { 
+    models, 
+    currentModel, 
+    currentModelId,
+    selectModel 
+  } = useModels()
+  
+  const { modelConfigs } = useModelContext()
+
+  const { 
     messages, 
     isStreaming, 
     sendMessage, 
     abortMessage 
-  } = useMessages({ sessionId: activeSessionId, messagesCache: getMessagesCache() })
-  
-  const { 
-    models, 
-    currentModel, 
-    selectModel 
-  } = useModels()
+  } = useMessages({ 
+    sessionId: activeSessionId, 
+    messagesCache: getMessagesCache(), 
+    currentModelId: currentModelId,
+    modelConfigs 
+  })
   
   // 当前会话信息
   const currentSession = projects
     .flatMap(p => p.sessions)
     .find(s => s.id === activeSessionId) || null
   
-  // 处理新建会话
-  const handleNewSession = async () => {
-    const session = await createSession()
+  // 处理新建会话（从 SessionList 传入已选好的文件夹路径）
+  const handleNewSession = async (projectPath?: string) => {
+    const session = await createSession(projectPath)
     if (session) {
       selectSession(session.id)
     }
@@ -94,6 +102,7 @@ export function ChatPage() {
             isStreaming={isStreaming}
             currentModel={currentModel}
             models={models}
+            sessionId={activeSessionId || undefined}
             onSend={sendMessage}
             onAbort={abortMessage}
             onSelectModel={selectModel}

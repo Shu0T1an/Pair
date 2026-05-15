@@ -7,6 +7,7 @@ interface ChatAreaProps {
   isStreaming?: boolean
   currentModel: ModelInfo | null
   models: ModelInfo[]
+  sessionId?: string
   onSend: (text: string) => void
   onAbort: () => void
   onSelectModel: (modelId: string) => void
@@ -17,6 +18,7 @@ export function ChatArea({
   isStreaming,
   currentModel,
   models,
+  sessionId,
   onSend,
   onAbort,
   onSelectModel,
@@ -35,6 +37,7 @@ export function ChatArea({
         currentModel={currentModel}
         models={models}
         isStreaming={isStreaming}
+        sessionId={sessionId}
         onSend={onSend}
         onAbort={onAbort}
         onSelectModel={onSelectModel}
