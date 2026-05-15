@@ -1,4 +1,4 @@
-import type { SessionInfo, ProjectSessions } from '@/shared/types';
+import type { SessionInfo, ProjectSessions, NotificationConfig } from '@/shared/types';
 
 // 事件数据类型定义
 export interface MessageStartEvent {
@@ -120,6 +120,12 @@ interface ElectronAPI {
     removeApiKey: (provider: string) => Promise<void>;
     syncConfig: (config: { provider: string; baseUrl: string; apiKey: string; models: Array<{ id: string; name?: string }> }) => Promise<void>;
     removeConfig: (provider: string) => Promise<void>;
+  };
+
+  // 通知配置
+  notification: {
+    getConfig: () => Promise<NotificationConfig>;
+    updateConfig: (config: Partial<NotificationConfig>) => Promise<void>;
   };
 
   // 事件订阅
@@ -409,6 +415,33 @@ export class IPCClient {
       return { usedTokens: 0, totalTokens: 128000, percentage: 0 };
     }
     return window.electronAPI.context.usage(sessionId);
+  }
+
+  /**
+   * 获取通知配置
+   */
+  async getNotificationConfig(): Promise<NotificationConfig> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，返回默认配置');
+      return {
+        enabled: true,
+        title: 'Pair',
+        body: 'AI 已完成回复',
+        triggerEvent: 'agent_end',
+      };
+    }
+    return window.electronAPI.notification.getConfig();
+  }
+
+  /**
+   * 更新通知配置
+   */
+  async updateNotificationConfig(config: Partial<NotificationConfig>): Promise<void> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，跳过更新通知配置');
+      return;
+    }
+    return window.electronAPI.notification.updateConfig(config);
   }
 
   // 便捷事件监听方法
