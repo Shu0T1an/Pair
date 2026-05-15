@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Settings,
   X,
@@ -28,6 +28,8 @@ import { ModelModal } from './modals/ModelModal'
 import { useModelContext, type ModelConfig } from '@/renderer/contexts/ModelContext'
 import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
 import { useTheme, themes, fontSizeMap, type FontSize } from '@/renderer/contexts/ThemeContext'
+import { ipcClient } from '@/renderer/ipc-client'
+import type { NotificationConfig } from '@/shared/types'
 
 type SettingsTab = 'general' | 'model' | 'message' | 'appearance' | 'about'
 
@@ -157,6 +159,38 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 }
 
 function GeneralSettings() {
+  const [notificationConfig, setNotificationConfig] = useState<NotificationConfig>({
+    enabled: true,
+    title: 'Pair',
+    body: 'AI 已完成回复',
+    triggerEvent: 'agent_end',
+  })
+
+  // 加载通知配置
+  const loadNotificationConfig = async () => {
+    try {
+      const config = await ipcClient.getNotificationConfig()
+      setNotificationConfig(config)
+    } catch (error) {
+      console.error('加载通知配置失败:', error)
+    }
+  }
+
+  // 保存通知配置
+  const saveNotificationConfig = async (newConfig: Partial<NotificationConfig>) => {
+    try {
+      await ipcClient.updateNotificationConfig(newConfig)
+      setNotificationConfig(prev => ({ ...prev, ...newConfig }))
+    } catch (error) {
+      console.error('保存通知配置失败:', error)
+    }
+  }
+
+  // 组件挂载时加载配置
+  useEffect(() => {
+    loadNotificationConfig()
+  }, [])
+
   return (
     <div className="space-y-6">
       <SettingsGroup title="基本设置">
@@ -172,16 +206,67 @@ function GeneralSettings() {
           }
         />
         <SettingsItem
-          icon={Bell}
-          label="通知"
-          description="接收消息通知"
-          action={<ToggleSwitch defaultChecked />}
-        />
-        <SettingsItem
           icon={Shield}
           label="隐私模式"
           description="不保存聊天记录"
           action={<ToggleSwitch />}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title="通知设置">
+        <SettingsItem
+          icon={Bell}
+          label="启用系统通知"
+          description="应用在后台时，AI 完成回复后弹出系统通知"
+          action={
+            <ToggleSwitch 
+              checked={notificationConfig.enabled}
+              onChange={(checked) => saveNotificationConfig({ enabled: checked })}
+            />
+          }
+        />
+        <SettingsItem
+          icon={MessageSquare}
+          label="通知标题"
+          description="通知弹窗的标题"
+          action={
+            <input
+              type="text"
+              value={notificationConfig.title}
+              onChange={(e) => saveNotificationConfig({ title: e.target.value })}
+              placeholder="Pair"
+              className="text-sm border border-border rounded-md px-2 py-1 bg-white w-32"
+            />
+          }
+        />
+        <SettingsItem
+          icon={MessageSquare}
+          label="通知正文"
+          description="通知弹窗的正文内容"
+          action={
+            <input
+              type="text"
+              value={notificationConfig.body}
+              onChange={(e) => saveNotificationConfig({ body: e.target.value })}
+              placeholder="AI 已完成回复"
+              className="text-sm border border-border rounded-md px-2 py-1 bg-white w-48"
+            />
+          }
+        />
+        <SettingsItem
+          icon={Zap}
+          label="触发事件"
+          description="何时发送通知"
+          action={
+            <select 
+              className="text-sm border border-border rounded-md px-2 py-1 bg-white"
+              value={notificationConfig.triggerEvent}
+              onChange={(e) => saveNotificationConfig({ triggerEvent: e.target.value as 'agent_end' | 'message_end' })}
+            >
+              <option value="agent_end">Agent 完成回复</option>
+              <option value="message_end">消息完成</option>
+            </select>
+          }
         />
       </SettingsGroup>
 
