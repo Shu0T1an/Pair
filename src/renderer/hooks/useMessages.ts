@@ -29,8 +29,10 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
   const rafIdRef = useRef<number | null>(null)
   const lastUpdateRef = useRef<number>(0)
 
-  // 刷新流缓冲区
-  const flushStreamBuffer = useCallback(() => {
+  // 刷新流缓冲区 - 使用 ref 来避免依赖问题
+  const flushStreamBufferRef = useRef<() => void>(() => {})
+  
+  flushStreamBufferRef.current = () => {
     if (rafIdRef.current) {
       cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = null
@@ -41,7 +43,7 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
     
     if (timeSinceLastUpdate < 16) {
       rafIdRef.current = requestAnimationFrame(() => {
-        flushStreamBuffer()
+        flushStreamBufferRef.current()
       })
       return
     }
@@ -66,7 +68,7 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
         return prev
       })
     }
-  }, [])
+  }
 
   // 加载会话消息
   const loadMessages = useCallback(async (sid: string) => {
@@ -162,7 +164,7 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
       if (event.sessionId !== sessionId) return
       
       streamBufferRef.current += event.text
-      flushStreamBuffer()
+      flushStreamBufferRef.current()
     })
 
     // thinking_delta
@@ -170,14 +172,14 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
       if (event.sessionId !== sessionId) return
       
       streamThinkingBufferRef.current += event.thinking
-      flushStreamBuffer()
+      flushStreamBufferRef.current()
     })
 
     // message_end
     const unsubMessageEnd = ipcClient.onMessageEnd((event: MessageEndEvent) => {
       if (event.sessionId !== sessionId) return
       
-      flushStreamBuffer()
+      flushStreamBufferRef.current()
       
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1]
@@ -257,7 +259,7 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
       unsubToolStart()
       unsubToolEnd()
     }
-  }, [sessionId, flushStreamBuffer])
+  }, [sessionId])
 
   // 缓存消息
   useEffect(() => {

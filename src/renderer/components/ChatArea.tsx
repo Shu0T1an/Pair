@@ -5,7 +5,6 @@ import { ChatInput } from './chat/ChatInput'
 interface ChatAreaProps {
   messages: Message[]
   isStreaming?: boolean
-  isLoading?: boolean
   currentModel: ModelInfo | null
   models: ModelInfo[]
   onSend: (text: string) => void
@@ -16,7 +15,6 @@ interface ChatAreaProps {
 export function ChatArea({
   messages,
   isStreaming,
-  isLoading,
   currentModel,
   models,
   onSend,

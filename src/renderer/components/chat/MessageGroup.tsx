@@ -19,11 +19,9 @@ interface MessageGroupProps {
 
 // Memoized Markdown 组件
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ 
-  content, 
-  isStreaming 
+  content
 }: { 
   content: string
-  isStreaming?: boolean 
 }) {
   return (
     <ReactMarkdown

@@ -19,7 +19,7 @@ export function ChatPage() {
     createSession,
     deleteSession,
     renameSession,
-    messagesCache 
+    getMessagesCache 
   } = useSessions()
   
   const { 
@@ -28,7 +28,7 @@ export function ChatPage() {
     isStreaming, 
     sendMessage, 
     abortMessage 
-  } = useMessages({ sessionId: activeSessionId, messagesCache })
+  } = useMessages({ sessionId: activeSessionId, messagesCache: getMessagesCache() })
   
   const { 
     models, 

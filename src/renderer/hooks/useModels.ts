@@ -65,8 +65,24 @@ export function useModels() {
 
   // 监听模型配置变化
   useEffect(() => {
-    loadModels()
-  }, [loadModels, modelConfigs])
+    const contextModels = getEnabledModels()
+    
+    if (contextModels.length > 0) {
+      const modelInfos: ModelInfo[] = contextModels.map(m => ({
+        id: m.id,
+        name: m.name,
+        provider: m.provider,
+      }))
+      setModels(modelInfos)
+      
+      // 如果当前模型不在列表中，选择第一个
+      if (!modelInfos.find(m => m.id === currentModelId)) {
+        setCurrentModelId(modelInfos[0].id)
+      }
+    } else {
+      setModels([])
+    }
+  }, [getEnabledModels, currentModelId, modelConfigs])
 
   return {
     models,

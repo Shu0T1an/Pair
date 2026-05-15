@@ -24,7 +24,6 @@ function saveLastSession(sessionId: string) {
 export function useSessions() {
   const [projects, setProjects] = useState<ProjectSessions[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   
   // 消息缓存
   const messagesCacheRef = useRef<Map<string, Message[]>>(new Map())
@@ -106,12 +105,11 @@ export function useSessions() {
   return {
     projects,
     activeSessionId,
-    isLoading,
     loadSessions,
     selectSession,
     createSession,
     deleteSession,
     renameSession,
-    messagesCache: messagesCacheRef.current,
+    getMessagesCache: () => messagesCacheRef.current,
   }
 }

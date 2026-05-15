@@ -3,7 +3,6 @@ import { ArrowDown } from 'lucide-react'
 import { Button } from '@/renderer/components/ui/button'
 import type { Message } from '@/shared/types'
 import { MessageGroup } from './MessageGroup'
-import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
 
 interface MessageListProps {
   messages: Message[]

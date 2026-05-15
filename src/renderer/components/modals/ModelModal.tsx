@@ -19,22 +19,23 @@ const API_TYPES = [
 ]
 
 export function ModelModal({ isOpen, onClose, mode, initialConfig, onSave }: ModelModalProps) {
-  const [name, setName] = useState(initialConfig?.name || '')
-  const [provider, setProvider] = useState(initialConfig?.provider || '')
-  const [baseUrl, setBaseUrl] = useState(initialConfig?.baseUrl || '')
-  const [apiKey, setApiKey] = useState(initialConfig?.apiKey || '')
-  const [api, setApi] = useState(initialConfig?.api || 'openai-completions')
-  const [isEnabled, setIsEnabled] = useState(initialConfig?.isEnabled ?? true)
+  const [name, setName] = useState('')
+  const [provider, setProvider] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [api, setApi] = useState('openai-completions')
+  const [isEnabled, setIsEnabled] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   
+  // 当弹窗打开时，从 initialConfig 初始化状态
   useEffect(() => {
-    if (isOpen && initialConfig) {
-      setName(initialConfig.name || '')
-      setProvider(initialConfig.provider || '')
-      setBaseUrl(initialConfig.baseUrl || '')
-      setApiKey(initialConfig.apiKey || '')
-      setApi(initialConfig.api || 'openai-completions')
-      setIsEnabled(initialConfig.isEnabled ?? true)
+    if (isOpen) {
+      setName(initialConfig?.name || '')
+      setProvider(initialConfig?.provider || '')
+      setBaseUrl(initialConfig?.baseUrl || '')
+      setApiKey(initialConfig?.apiKey || '')
+      setApi(initialConfig?.api || 'openai-completions')
+      setIsEnabled(initialConfig?.isEnabled ?? true)
     }
   }, [isOpen, initialConfig])
   
