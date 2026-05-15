@@ -76,6 +76,7 @@ interface AgentManager {
   resumeSession(sessionId: string): Promise<AgentSession>;
   listSessions(): Promise<ProjectSessions[]>;
   deleteSession(sessionId: string): Promise<void>;
+  deleteAllSessions(): Promise<void>;  // 新增：删除所有会话
 }
 ```
 
@@ -200,6 +201,7 @@ npm run package:linux    # Linux
 1. **进程隔离**: 主进程和渲染进程通过 IPC 通信，不要直接共享状态
 2. **安全性**: 默认启用 contextIsolation，谨慎使用 nodeIntegration
 3. **会话管理**: 会话按项目分组，每个项目可有多个会话
+   - **新会话命名规则**: 新会话-YYMMDD (例如: 新会话-260515)
 4. **工具调用**: UI 需要可视化工具调用状态（执行中/成功/失败）
 5. **错误处理**: 网络错误重试、认证错误提示登录、会话错误尝试恢复
 

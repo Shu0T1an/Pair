@@ -143,12 +143,17 @@ export class AgentManager extends EventEmitter {
 
     const { session } = await createAgentSession(sessionOptions);
 
+    // 生成会话名称: 新会话-YYMMDD
+    const now = new Date();
+    const dateStr = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
+    const defaultName = `新会话-${dateStr}`;
+    
     const sessionInfo: SessionInfo = {
       id: session.sessionId,
-      name: options.name || '新会话',
+      name: options.name || defaultName,
       projectPath: options.projectPath,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       messageCount: 0,
       model: session.model?.id || 'unknown',
       sessionFile: session.sessionManager.getSessionFile(),
@@ -408,6 +413,55 @@ export class AgentManager extends EventEmitter {
     this.sessionMetadata.delete(sessionId);
     this.saveMetadata();
     this.currentMessageIds.delete(sessionId);
+  }
+
+  /**
+   * 删除所有会话
+   */
+  async deleteAllSessions(): Promise<void> {
+    // 清理所有内存中的会话
+    for (const [sessionId, entry] of this.sessions.entries()) {
+      if (entry.unsubscribe) {
+        entry.unsubscribe();
+      }
+      entry.session.dispose();
+      this.currentMessageIds.delete(sessionId);
+    }
+    this.sessions.clear();
+    
+    // 清空元数据
+    this.sessionMetadata.clear();
+    this.saveMetadata();
+  }
+
+  /**
+   * 删除指定项目下的所有会话
+   */
+  async deleteAllSessionsInProject(projectPath: string): Promise<void> {
+    const sessionIdsToDelete: string[] = [];
+    
+    // 找出该项目下的所有会话
+    for (const [sessionId, info] of this.sessionMetadata.entries()) {
+      if (info.projectPath === projectPath) {
+        sessionIdsToDelete.push(sessionId);
+      }
+    }
+    
+    // 删除这些会话
+    for (const sessionId of sessionIdsToDelete) {
+      const entry = this.sessions.get(sessionId);
+      if (entry) {
+        if (entry.unsubscribe) {
+          entry.unsubscribe();
+        }
+        entry.session.dispose();
+        this.sessions.delete(sessionId);
+      }
+      this.sessionMetadata.delete(sessionId);
+      this.currentMessageIds.delete(sessionId);
+    }
+    
+    this.saveMetadata();
   }
 
   /**

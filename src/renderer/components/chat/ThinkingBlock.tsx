@@ -12,7 +12,7 @@ export function ThinkingBlock({ thinking, isStreaming, defaultExpanded = false }
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   
   return (
-    <div className="mb-2">
+    <div className="mb-0">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"

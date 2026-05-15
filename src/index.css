@@ -3,63 +3,34 @@
 @plugin "@tailwindcss/typography";
 @import "highlight.js/styles/github.css";
 
-/* 主题变量 - 使用 HSL (参考浅灰色系风格) */
+/* 主题变量 - 默认值，由 ThemeContext 动态覆盖 */
 :root {
-  --background: 0 0% 96%;           /* #f5f5f5 浅冷灰背景 */
-  --foreground: 0 0% 20%;           /* #333333 主文字 */
-  --muted: 0 0% 93%;               /* #ededed 侧边栏/次要背景 */
-  --muted-foreground: 0 0% 60%;     /* gray-500 次要文字 */
-  --border: 0 0% 90%;              /* #e5e5e5 浅灰色边框 */
-  --input: 0 0% 94%;               /* #f0f0f0 输入框背景 */
-  --ring: 0 0% 10%;                /* #1a1a1a 焦点环 */
-  --primary: 0 0% 10%;             /* #1a1a1a 黑色强调 */
-  --primary-foreground: 0 0% 100%; /* white */
-  --secondary: 0 0% 100%;          /* white */
+  --background: 0 0% 96%;
+  --foreground: 0 0% 20%;
+  --muted: 0 0% 93%;
+  --muted-foreground: 0 0% 60%;
+  --border: 0 0% 90%;
+  --input: 0 0% 94%;
+  --ring: 0 0% 10%;
+  --primary: 0 0% 10%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 100%;
   --secondary-foreground: 0 0% 10%;
-  --accent: 0 0% 10%;              /* #1a1a1a */
+  --accent: 0 0% 10%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 70% 50%;
   --destructive-foreground: 0 0% 100%;
-  --card: 0 0% 100%;               /* white 卡片 */
+  --card: 0 0% 100%;
   --card-foreground: 0 0% 20%;
-  --popover: 0 0% 100%;            /* white 弹出菜单 */
+  --popover: 0 0% 100%;
   --popover-foreground: 0 0% 20%;
   --dialog: 0 0% 100%;
   --tooltip: 0 0% 10%;
   --tooltip-foreground: 0 0% 98%;
-  --code-bg: 0 0% 100%;  /* 纯白背景 */
-  --tw-prose-pre-bg: hsl(0, 0%, 100%);  /* Tailwind 代码块背景：纯白 */
-  --sidebar: 0 0% 93%;             /* #ededed 侧边栏 */
+  --code-bg: 0 0% 100%;
+  --tw-prose-pre-bg: hsl(0, 0%, 100%);
+  --sidebar: 0 0% 93%;
   --sidebar-foreground: 0 0% 20%;
-}
-
-.dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --accent: 240 3.7% 25%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 55% 45%;
-  --destructive-foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --dialog: 240 10% 5%;
-  --tooltip: 240 5% 20%;
-  --tooltip-foreground: 0 0% 98%;
-  --code-bg: 240 20% 8%;  /* 接近黑色的背景 */
-  --tw-prose-pre-bg: hsl(240, 20%, 8%);  /* Tailwind 代码块背景：接近黑色 */
-  --sidebar: 240 5% 8%;
-  --sidebar-foreground: 0 0% 98%;
 }
 
 /* 全局基础样式 */

@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { ChatArea } from '@/renderer/components/ChatArea'
 import { SessionList } from '@/renderer/components/SessionList'
 import { Header } from '@/renderer/components/Header'
+import { TitleBar } from '@/renderer/components/TitleBar'
 import { SettingsModal } from '@/renderer/components/SettingsModal'
 import { useSessions } from '@/renderer/hooks/useSessions'
 import { useMessages } from '@/renderer/hooks/useMessages'
 import { useModels } from '@/renderer/hooks/useModels'
+import { useTheme } from '@/renderer/contexts/ThemeContext'
 
 export function ChatPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [isDark, setIsDark] = useState(true)
+  const { isDark, toggleDark } = useTheme()
   
   // 使用 Hooks
   const { 
@@ -18,6 +20,8 @@ export function ChatPage() {
     selectSession, 
     createSession,
     deleteSession,
+    deleteAllSessions,
+    deleteAllSessionsInProject,
     renameSession,
     getMessagesCache 
   } = useSessions()
@@ -56,14 +60,11 @@ export function ChatPage() {
     }
   }
   
-  // 切换主题
-  const handleToggleTheme = () => {
-    setIsDark(!isDark)
-    document.documentElement.classList.toggle('dark')
-  }
-  
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
+      {/* 标题栏 */}
+      <TitleBar />
+      
       <div className="flex-1 flex gap-4 p-4 min-h-0">
         {/* 侧边栏 */}
         <aside className="w-64 shrink-0">
@@ -74,17 +75,18 @@ export function ChatPage() {
             onNewSession={handleNewSession}
             onNewSessionInProject={handleNewSessionInProject}
             onDeleteSession={deleteSession}
+            onDeleteAllSessionsInProject={deleteAllSessionsInProject}
             onRenameSession={renameSession}
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
         </aside>
 
         {/* 主内容区域 */}
-        <main className="flex-1 bg-card rounded-2xl flex flex-col shadow-sm relative overflow-hidden border border-border">
+        <main className="flex-1 min-h-0 bg-card rounded-2xl flex flex-col shadow-sm relative overflow-hidden border border-border">
           <Header
             session={currentSession}
             isDark={isDark}
-            onToggleTheme={handleToggleTheme}
+            onToggleTheme={toggleDark}
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
           <ChatArea

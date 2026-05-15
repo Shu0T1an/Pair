@@ -38,45 +38,75 @@ export function MessageList({ messages, modelName, isStreaming }: MessageListPro
   const viewportRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
-  const [isAtBottom, setIsAtBottom] = useState(true)
+  const userScrolledUpRef = useRef(false)
+  const isScrollingToBottomRef = useRef(false)
+  
+  // 直接滚动到底部（无动画，更可靠）
+  const scrollToBottomImmediate = useCallback(() => {
+    const container = viewportRef.current
+    if (!container) return
+    
+    isScrollingToBottomRef.current = true
+    container.scrollTop = container.scrollHeight
+    // 使用 requestAnimationFrame 重置标记
+    requestAnimationFrame(() => {
+      isScrollingToBottomRef.current = false
+    })
+  }, [])
   
   // 监听滚动事件
   const handleScroll = useCallback(() => {
     const container = viewportRef.current
     if (!container) return
     
+    // 忽略自动滚动触发的事件
+    if (isScrollingToBottomRef.current) return
+    
     const { scrollTop, scrollHeight, clientHeight } = container
     const isBottom = scrollHeight - scrollTop - clientHeight < 50
     
-    setIsAtBottom(isBottom)
     setShowScrollButton(!isBottom)
+    
+    // 如果用户向上滚动（不在底部），标记用户已向上滚动
+    if (!isBottom) {
+      userScrolledUpRef.current = true
+    } else {
+      // 如果用户滚动到底部，重置用户滚动状态
+      userScrolledUpRef.current = false
+    }
   }, [])
   
   useEffect(() => {
     const container = viewportRef.current
     if (!container) return
     
-    container.addEventListener('scroll', handleScroll)
+    container.addEventListener('scroll', handleScroll, { passive: true })
     return () => container.removeEventListener('scroll', handleScroll)
   }, [handleScroll])
   
   // 流式消息时自动滚动到底部
   useEffect(() => {
-    if (isStreaming && isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // 如果是流式输出，且用户没有主动向上滚动，则自动滚动到底部
+    if (isStreaming && !userScrolledUpRef.current) {
+      scrollToBottomImmediate()
     }
-  }, [messages, isStreaming, isAtBottom])
+    // 如果流式输出结束，重置用户滚动状态
+    if (!isStreaming) {
+      userScrolledUpRef.current = false
+    }
+  }, [messages, isStreaming, scrollToBottomImmediate])
   
-  // 滚动到底部
+  // 滚动到底部（带动画）
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    userScrolledUpRef.current = false
   }, [])
   
   // 消息分组
   const groups = groupMessages(messages)
   
   return (
-    <div className="relative flex-1">
+    <div className="relative flex-1 min-h-0 overflow-hidden">
       <div 
         ref={viewportRef}
         className="h-full overflow-y-auto px-4 py-6"

@@ -10,6 +10,24 @@ import type {
   ToolEndEvent 
 } from '@/renderer/ipc-client'
 
+// 将工具结果转换为字符串
+function toolResultToString(result: unknown): string {
+  if (typeof result === 'string') {
+    return result
+  }
+  if (typeof result === 'object' && result !== null) {
+    const obj = result as Record<string, unknown>
+    if ('text' in obj && typeof obj.text === 'string') {
+      return obj.text
+    }
+    if ('content' in obj && typeof obj.content === 'string') {
+      return obj.content
+    }
+    return JSON.stringify(result, null, 2)
+  }
+  return String(result)
+}
+
 interface UseMessagesOptions {
   sessionId: string | null
   messagesCache: Map<string, Message[]>
@@ -232,13 +250,14 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1]
         if (lastMessage && lastMessage.role === 'assistant' && lastMessage.toolCalls) {
+          const resultStr = toolResultToString(event.result)
           const updatedToolCalls = lastMessage.toolCalls.map(tc => {
             if (tc.id === event.toolCallId) {
               return {
                 ...tc,
                 status: event.isError ? 'error' as const : 'success' as const,
-                result: event.result,
-                error: event.isError ? event.result : undefined,
+                result: resultStr,
+                error: event.isError ? resultStr : undefined,
                 endTime: new Date(),
               }
             }

@@ -97,7 +97,7 @@ export function MessageGroup({ role, messages, modelName, showTimestamp }: Messa
         </div>
         
         {/* 多条消息堆叠 */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           {messages.map((message) => {
             const isStreamingMsg = message.isStreaming
             const hasContent = message.content.length > 0
@@ -105,7 +105,7 @@ export function MessageGroup({ role, messages, modelName, showTimestamp }: Messa
             const hasToolCalls = message.toolCalls && message.toolCalls.length > 0
             
             return (
-              <div key={message.id}>
+              <div key={message.id} className="space-y-0.5">
                 {/* Thinking 内容 */}
                 {hasThinking && (
                   <ThinkingBlock 
@@ -115,7 +115,7 @@ export function MessageGroup({ role, messages, modelName, showTimestamp }: Messa
                   />
                 )}
                 
-                <div className={cn('group relative', 'text-foreground px-1')}>
+                <div className={cn('group relative', 'text-foreground px-1', hasContent && 'py-0.5')}>
                   {/* 正文内容 */}
                   {hasContent ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -126,7 +126,7 @@ export function MessageGroup({ role, messages, modelName, showTimestamp }: Messa
                   ) : !hasThinking && !hasToolCalls ? (
                     <div className="min-h-[1.5rem]" />
                   ) : (
-                    <div className="min-h-[0.5rem]" />
+                    null
                   )}
                   
                   {/* 复制按钮 */}

@@ -72,6 +72,8 @@ export class IPCHandler {
     ipcMain.handle('session:create', this.handleCreateSession.bind(this));
     ipcMain.handle('session:list', this.handleListSessions.bind(this));
     ipcMain.handle('session:delete', this.handleDeleteSession.bind(this));
+    ipcMain.handle('session:deleteAll', this.handleDeleteAllSessions.bind(this));
+    ipcMain.handle('session:deleteAllInProject', this.handleDeleteAllSessionsInProject.bind(this));
     ipcMain.handle('session:info', this.handleGetSessionInfo.bind(this));
     ipcMain.handle('session:update', this.handleUpdateSession.bind(this));
     ipcMain.handle('session:messages', this.handleGetSessionMessages.bind(this));
@@ -132,6 +134,30 @@ export class IPCHandler {
       await this.agentManager.deleteSession(sessionId);
     } catch (error) {
       console.error('删除会话失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 删除所有会话
+   */
+  private async handleDeleteAllSessions(): Promise<void> {
+    try {
+      await this.agentManager.deleteAllSessions();
+    } catch (error) {
+      console.error('删除所有会话失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 删除指定项目下的所有会话
+   */
+  private async handleDeleteAllSessionsInProject(_event: any, projectPath: string): Promise<void> {
+    try {
+      await this.agentManager.deleteAllSessionsInProject(projectPath);
+    } catch (error) {
+      console.error('删除项目会话失败:', error);
       throw error;
     }
   }
@@ -401,6 +427,8 @@ export class IPCHandler {
     ipcMain.removeHandler('session:create');
     ipcMain.removeHandler('session:list');
     ipcMain.removeHandler('session:delete');
+    ipcMain.removeHandler('session:deleteAll');
+    ipcMain.removeHandler('session:deleteAllInProject');
     ipcMain.removeHandler('session:info');
     ipcMain.removeHandler('session:update');
     ipcMain.removeHandler('session:messages');

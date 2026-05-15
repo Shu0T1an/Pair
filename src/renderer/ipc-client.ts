@@ -97,6 +97,8 @@ interface ElectronAPI {
     create: (options: { projectPath: string; name?: string; modelId?: string }) => Promise<SessionInfo>;
     list: () => Promise<ProjectSessions[]>;
     delete: (sessionId: string) => Promise<void>;
+    deleteAll: () => Promise<void>;
+    deleteAllInProject: (projectPath: string) => Promise<void>;
     info: (sessionId: string) => Promise<SessionInfo | undefined>;
     update: (sessionId: string, updates: Partial<SessionInfo>) => Promise<void>;
     messages: (sessionId: string) => Promise<any[]>;
@@ -181,6 +183,28 @@ export class IPCClient {
       return;
     }
     return window.electronAPI.session.delete(sessionId);
+  }
+
+  /**
+   * 删除所有会话
+   */
+  async deleteAllSessions(): Promise<void> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，跳过删除全部');
+      return;
+    }
+    return window.electronAPI.session.deleteAll();
+  }
+
+  /**
+   * 删除指定项目下的所有会话
+   */
+  async deleteAllSessionsInProject(projectPath: string): Promise<void> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，跳过删除项目会话');
+      return;
+    }
+    return window.electronAPI.session.deleteAllInProject(projectPath);
   }
 
   /**

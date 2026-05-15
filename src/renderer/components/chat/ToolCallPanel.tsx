@@ -2,14 +2,129 @@ import { useState } from 'react'
 import { 
   Wrench, 
   ChevronDown, 
+  ChevronRight,
   Loader2, 
   CheckCircle2, 
   XCircle,
   Copy,
-  Check 
+  Check,
+  FileText,
+  Terminal,
+  FileEdit,
+  FilePlus,
+  Search,
+  FolderOpen,
+  List,
+  Code,
+  Clock
 } from 'lucide-react'
 import { cn } from '@/renderer/lib/utils'
 import type { ToolCall } from '@/shared/types'
+
+// 格式化结果
+function formatResult(result: string | { content?: string; details?: unknown; type?: string; text?: string }): string {
+  if (typeof result === 'string') {
+    return result
+  }
+  if (typeof result === 'object' && result !== null) {
+    if ('text' in result && typeof result.text === 'string') {
+      return result.text
+    }
+    if ('content' in result && typeof result.content === 'string') {
+      return result.content
+    }
+    return JSON.stringify(result, null, 2)
+  }
+  return String(result)
+}
+
+// 格式化执行时长
+function formatDuration(startTime?: Date, endTime?: Date): string {
+  if (!startTime) return ''
+  const end = endTime || new Date()
+  const duration = end.getTime() - new Date(startTime).getTime()
+  if (duration < 1000) return `${duration}ms`
+  if (duration < 60000) return `${(duration / 1000).toFixed(1)}s`
+  const minutes = Math.floor(duration / 60000)
+  const seconds = Math.floor((duration % 60000) / 1000)
+  return `${minutes}m ${seconds}s`
+}
+
+// 提取工具关键参数摘要
+function getToolSummary(toolName: string, args?: Record<string, unknown>): string {
+  if (!args) return ''
+  const name = toolName.toLowerCase()
+  
+  switch (name) {
+    case 'read': {
+      const path = args.path || args.file || args.filePath
+      return path ? String(path) : ''
+    }
+    case 'edit': {
+      const path = args.path || args.file || args.filePath
+      return path ? String(path) : ''
+    }
+    case 'write': {
+      const path = args.path || args.file || args.filePath
+      return path ? String(path) : ''
+    }
+    case 'bash': {
+      const cmd = args.command || args.cmd
+      if (cmd) {
+        const cmdStr = String(cmd)
+        // 截断过长的命令
+        return cmdStr.length > 60 ? cmdStr.slice(0, 57) + '...' : cmdStr
+      }
+      return ''
+    }
+    case 'grep': {
+      const pattern = args.pattern || args.query
+      const path = args.path || args.dir
+      if (pattern && path) return `${pattern} @ ${path}`
+      if (pattern) return String(pattern)
+      return ''
+    }
+    case 'find': {
+      const path = args.path || args.dir || args.root
+      const name = args.name || args.pattern
+      if (path && name) return `${path} · ${name}`
+      if (path) return String(path)
+      return ''
+    }
+    case 'ls': {
+      const path = args.path || args.dir
+      return path ? String(path) : ''
+    }
+    default:
+      return ''
+  }
+}
+
+// 工具图标映射
+function getToolIcon(toolName: string) {
+  const name = toolName.toLowerCase()
+  switch (name) {
+    case 'read':
+      return <FileText size={14} className="text-blue-500" />
+    case 'bash':
+      return <Terminal size={14} className="text-green-500" />
+    case 'edit':
+      return <FileEdit size={14} className="text-orange-500" />
+    case 'write':
+      return <FilePlus size={14} className="text-purple-500" />
+    case 'grep':
+      return <Search size={14} className="text-yellow-500" />
+    case 'find':
+      return <FolderOpen size={14} className="text-cyan-500" />
+    case 'ls':
+      return <List size={14} className="text-pink-500" />
+    case 'code':
+    case 'code-xml':
+      return <Code size={14} className="text-indigo-500" />
+    default:
+      return <Wrench size={14} className="text-muted-foreground" />
+  }
+}
 
 interface ToolCallPanelProps {
   toolCalls: ToolCall[]
@@ -21,29 +136,17 @@ function getStatusIcon(status: ToolCall['status']) {
   switch (status) {
     case 'pending':
     case 'running':
-      return <Loader2 size={14} className="animate-spin text-blue-500" />
+      return <Loader2 size={12} className="animate-spin text-blue-500" />
     case 'success':
-      return <CheckCircle2 size={14} className="text-green-500" />
+      return <CheckCircle2 size={12} className="text-green-500" />
     case 'error':
-      return <XCircle size={14} className="text-red-500" />
-  }
-}
-
-function getStatusText(status: ToolCall['status']) {
-  switch (status) {
-    case 'pending':
-      return '等待中'
-    case 'running':
-      return '执行中'
-    case 'success':
-      return '完成'
-    case 'error':
-      return '失败'
+      return <XCircle size={12} className="text-red-500" />
   }
 }
 
 export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false }: ToolCallPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const [isListExpanded, setIsListExpanded] = useState(defaultExpanded)
+  const [selectedToolId, setSelectedToolId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   
   const handleCopy = (content: string, id: string) => {
@@ -53,88 +156,147 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
   }
   
   const runningCount = toolCalls.filter(tc => tc.status === 'running').length
-  const completedCount = toolCalls.filter(tc => tc.status === 'success').length
+  const errorCount = toolCalls.filter(tc => tc.status === 'error').length
   
   return (
-    <div className="mt-2 border rounded-lg overflow-hidden">
+    <div className="mb-0">
+      {/* 第一层：概要 */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted transition-colors text-sm"
+        onClick={() => setIsListExpanded(!isListExpanded)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        <Wrench size={14} />
-        <span className="font-medium">
-          工具调用 ({toolCalls.length})
-        </span>
+        <Wrench size={14} className={cn(isStreaming && runningCount > 0 && 'animate-pulse')} />
+        <span>已调用 {toolCalls.length} 个工具</span>
+        
         {isStreaming && runningCount > 0 && (
-          <span className="text-blue-500 text-xs">
-            {runningCount} 个执行中
+          <span className="text-blue-500">
+            · {runningCount} 执行中
           </span>
         )}
-        {!isStreaming && completedCount > 0 && (
-          <span className="text-green-500 text-xs">
-            {completedCount} 个完成
+        {!isStreaming && errorCount > 0 && (
+          <span className="text-red-500">
+            · {errorCount} 失败
           </span>
         )}
+        
         <ChevronDown 
-          size={14} 
+          size={12} 
           className={cn(
-            'ml-auto transition-transform',
-            isExpanded && 'rotate-180'
+            'transition-transform',
+            isListExpanded && 'rotate-180'
           )} 
         />
       </button>
       
-      {isExpanded && (
-        <div className="divide-y">
-          {toolCalls.map((toolCall) => (
-            <div key={toolCall.id} className="px-3 py-2">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(toolCall.status)}
-                <span className="font-mono text-sm">{toolCall.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {getStatusText(toolCall.status)}
-                </span>
-              </div>
-              
-              {/* 参数 */}
-              {toolCall.args && Object.keys(toolCall.args).length > 0 && (
-                <div className="mt-1.5 pl-6">
-                  <div className="text-xs text-muted-foreground mb-1">参数:</div>
-                  <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-                    {JSON.stringify(toolCall.args, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {/* 结果 */}
-              {toolCall.result && (
-                <div className="mt-1.5 pl-6">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                    <span>结果:</span>
-                    <button
-                      onClick={() => handleCopy(toolCall.result!, toolCall.id)}
-                      className="hover:text-foreground"
-                    >
-                      {copiedId === toolCall.id ? <Check size={10} /> : <Copy size={10} />}
-                    </button>
+      {/* 第二层：工具列表 */}
+      {isListExpanded && (
+        <div className="mt-1.5 pl-5 border-l-2 border-muted space-y-0.5">
+          {toolCalls.map((toolCall) => {
+            const duration = formatDuration(toolCall.startTime, toolCall.endTime)
+            const isSelected = selectedToolId === toolCall.id
+            const summary = getToolSummary(toolCall.name, toolCall.args)
+            
+            return (
+              <div key={toolCall.id}>
+                {/* 工具项 */}
+                <button
+                  onClick={() => setSelectedToolId(isSelected ? null : toolCall.id)}
+                  className={cn(
+                    'w-full flex items-center gap-2 py-1 text-sm transition-colors rounded',
+                    'hover:bg-muted/50 px-1.5',
+                    isSelected && 'bg-muted/50',
+                    toolCall.status === 'running' && 'text-blue-500'
+                  )}
+                >
+                  {getToolIcon(toolCall.name)}
+                  
+                  <span className="font-mono text-xs text-left">
+                    {toolCall.name}
+                  </span>
+                  
+                  {summary && (
+                    <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                      {summary}
+                    </span>
+                  )}
+                  
+                  {duration && (
+                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                      <Clock size={10} />
+                      {duration}
+                    </span>
+                  )}
+                  
+                  {getStatusIcon(toolCall.status)}
+                  
+                  <ChevronRight 
+                    size={10} 
+                    className={cn(
+                      'transition-transform text-muted-foreground',
+                      isSelected && 'rotate-90'
+                    )}
+                  />
+                </button>
+                
+                {/* 第三层：工具详情 */}
+                {isSelected && (
+                  <div className="ml-6 mt-1 mb-2 space-y-3 text-xs">
+                    {/* 参数 */}
+                    {toolCall.args && Object.keys(toolCall.args).length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-foreground font-medium">输入参数</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCopy(JSON.stringify(toolCall.args, null, 2), `args-${toolCall.id}`)
+                            }}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            {copiedId === `args-${toolCall.id}` ? <Check size={10} /> : <Copy size={10} />}
+                          </button>
+                        </div>
+                        <pre className="text-[11px] text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-32 font-mono border border-border/50">
+                          {JSON.stringify(toolCall.args, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    
+                    {/* 结果 */}
+                    {toolCall.result && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-foreground font-medium">输出结果</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCopy(formatResult(toolCall.result!), `result-${toolCall.id}`)
+                            }}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            {copiedId === `result-${toolCall.id}` ? <Check size={10} /> : <Copy size={10} />}
+                          </button>
+                        </div>
+                        <pre className="text-[11px] text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-48 font-mono whitespace-pre-wrap border border-border/50">
+                          {formatResult(toolCall.result)}
+                        </pre>
+                      </div>
+                    )}
+                    
+                    {/* 错误 */}
+                    {toolCall.error && (
+                      <div>
+                        <div className="text-red-500 font-medium mb-1">错误</div>
+                        <pre className="text-[11px] text-red-500 bg-red-500/10 p-2 rounded-md overflow-x-auto max-h-32 font-mono border border-red-500/30">
+                          {formatResult(toolCall.error)}
+                        </pre>
+                      </div>
+                    )}
                   </div>
-                  <pre className="text-xs bg-muted p-2 rounded overflow-x-auto max-h-40">
-                    {toolCall.result}
-                  </pre>
-                </div>
-              )}
-              
-              {/* 错误 */}
-              {toolCall.error && (
-                <div className="mt-1.5 pl-6">
-                  <div className="text-xs text-red-500 mb-1">错误:</div>
-                  <pre className="text-xs bg-red-500/10 p-2 rounded text-red-500 overflow-x-auto">
-                    {toolCall.error}
-                  </pre>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

@@ -74,6 +74,34 @@ export function useSessions() {
     }
   }, [activeSessionId, loadSessions])
 
+  // 删除所有会话
+  const deleteAllSessions = useCallback(async () => {
+    try {
+      await ipcClient.deleteAllSessions()
+      messagesCacheRef.current.clear()
+      setActiveSessionId(null)
+      await loadSessions()
+    } catch (error) {
+      console.error('删除所有会话失败:', error)
+    }
+  }, [loadSessions])
+
+  // 删除指定项目下的所有会话
+  const deleteAllSessionsInProject = useCallback(async (projectPath: string) => {
+    try {
+      await ipcClient.deleteAllSessionsInProject(projectPath)
+      // 如果当前活动会话属于该项目，清除活动会话
+      const currentSession = projects.flatMap(p => p.sessions).find(s => s.id === activeSessionId)
+      if (currentSession && currentSession.projectPath === projectPath) {
+        setActiveSessionId(null)
+      }
+      messagesCacheRef.current.clear()
+      await loadSessions()
+    } catch (error) {
+      console.error('删除项目会话失败:', error)
+    }
+  }, [activeSessionId, projects, loadSessions])
+
   // 重命名会话
   const renameSession = useCallback(async (sessionId: string, newName: string) => {
     try {
@@ -109,6 +137,8 @@ export function useSessions() {
     selectSession,
     createSession,
     deleteSession,
+    deleteAllSessions,
+    deleteAllSessionsInProject,
     renameSession,
     getMessagesCache: () => messagesCacheRef.current,
   }

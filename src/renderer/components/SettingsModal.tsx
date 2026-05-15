@@ -21,11 +21,13 @@ import {
   Wrench,
   Eye,
   RotateCcw,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/renderer/lib/utils'
 import { ModelModal } from './modals/ModelModal'
 import { useModelContext, type ModelConfig } from '@/renderer/contexts/ModelContext'
 import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
+import { useTheme, themes, type ThemeName, fontSizeMap, type FontSize } from '@/renderer/contexts/ThemeContext'
 
 type SettingsTab = 'general' | 'model' | 'message' | 'appearance' | 'about'
 
@@ -412,21 +414,103 @@ function MessageSettings() {
 }
 
 function AppearanceSettings() {
+  const { currentTheme, isDark, fontSize, setTheme, toggleDark, setFontSize } = useTheme()
+
   return (
     <div className="space-y-6">
-      <SettingsGroup title="主题">
+      <SettingsGroup title="深浅模式">
         <SettingsItem
           icon={Sun}
           label="浅色模式"
           description="使用浅色主题"
-          action={<RadioCircle name="theme" defaultChecked />}
+          action={
+            <RadioCircle 
+              name="theme-mode" 
+              checked={!isDark}
+              onChange={() => { if (isDark) toggleDark() }}
+            />
+          }
         />
         <SettingsItem
           icon={Moon}
           label="深色模式"
           description="使用深色主题"
-          action={<RadioCircle name="theme" />}
+          action={
+            <RadioCircle 
+              name="theme-mode" 
+              checked={isDark}
+              onChange={() => { if (!isDark) toggleDark() }}
+            />
+          }
         />
+      </SettingsGroup>
+
+      <SettingsGroup title="颜色主题">
+        <div className="p-4">
+          <div className="grid grid-cols-3 gap-3">
+            {themes.map((theme) => (
+              <button
+                key={theme.name}
+                onClick={() => setTheme(theme.name)}
+                className={cn(
+                  'relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all',
+                  currentTheme === theme.name
+                    ? 'border-primary shadow-md'
+                    : 'border-transparent hover:border-border hover:bg-muted/50'
+                )}
+              >
+                {/* 预览色块 */}
+                <div 
+                  className="w-12 h-12 rounded-lg shadow-inner"
+                  style={{ backgroundColor: theme.preview }}
+                />
+                {/* 主题名称 */}
+                <span className="text-xs font-medium">{theme.label}</span>
+                {/* 选中指示器 */}
+                {currentTheme === theme.name && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                    <Check size={12} className="text-primary-foreground" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </SettingsGroup>
+
+      <SettingsGroup title="字体大小">
+        <div className="p-4">
+          <div className="flex gap-3">
+            {(Object.keys(fontSizeMap) as FontSize[]).map((size) => (
+              <button
+                key={size}
+                onClick={() => setFontSize(size)}
+                className={cn(
+                  'flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all',
+                  fontSize === size
+                    ? 'border-primary shadow-md bg-primary/5'
+                    : 'border-transparent hover:border-border hover:bg-muted/50'
+                )}
+              >
+                {/* 预览文字 */}
+                <span 
+                  className="font-medium"
+                  style={{ fontSize: fontSizeMap[size].value }}
+                >
+                  {fontSizeMap[size].preview}
+                </span>
+                {/* 大小名称 */}
+                <span className="text-xs font-medium">{fontSizeMap[size].label}</span>
+                {/* 选中指示器 */}
+                {fontSize === size && (
+                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                    <Check size={12} className="text-primary-foreground" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </SettingsGroup>
 
       <SettingsGroup title="布局">
@@ -438,17 +522,6 @@ function AppearanceSettings() {
               <option>窄</option>
               <option defaultChecked>标准</option>
               <option>宽</option>
-            </select>
-          }
-        />
-        <SettingsItem
-          label="字体大小"
-          description="调整界面文字大小"
-          action={
-            <select className="text-sm border border-border rounded-md px-2 py-1 bg-white">
-              <option>小</option>
-              <option defaultChecked>中</option>
-              <option>大</option>
             </select>
           }
         />
@@ -586,8 +659,17 @@ function ToggleSwitch({ defaultChecked, checked, onChange }: { defaultChecked?: 
   )
 }
 
-function RadioCircle({ name, defaultChecked = false }: { name: string; defaultChecked?: boolean }) {
-  const [isChecked, setIsChecked] = useState(defaultChecked)
+function RadioCircle({ name, defaultChecked = false, checked, onChange }: { name: string; defaultChecked?: boolean; checked?: boolean; onChange?: () => void }) {
+  const isControlled = checked !== undefined
+  const [internalChecked, setInternalChecked] = useState(defaultChecked ?? false)
+  const isChecked = isControlled ? checked : internalChecked
+  
+  const handleChange = () => {
+    if (!isControlled) {
+      setInternalChecked(true)
+    }
+    onChange?.()
+  }
   
   return (
     <label className="relative inline-flex items-center cursor-pointer">
@@ -595,10 +677,13 @@ function RadioCircle({ name, defaultChecked = false }: { name: string; defaultCh
         type="radio" 
         name={name} 
         checked={isChecked}
-        onChange={() => setIsChecked(true)}
+        onChange={handleChange}
         className="sr-only peer" 
       />
-      <div className="w-5 h-5 border-2 border-border rounded-full peer-checked:border-primary relative">
+      <div className={cn(
+        'w-5 h-5 border-2 rounded-full transition-colors',
+        isChecked ? 'border-primary' : 'border-border'
+      )}>
         {isChecked && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-primary rounded-full"></div>
         )}

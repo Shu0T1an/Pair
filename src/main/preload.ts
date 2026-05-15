@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('session:create', options),
     list: () => ipcRenderer.invoke('session:list'),
     delete: (sessionId: string) => ipcRenderer.invoke('session:delete', sessionId),
+    deleteAll: () => ipcRenderer.invoke('session:deleteAll'),
+    deleteAllInProject: (projectPath: string) => ipcRenderer.invoke('session:deleteAllInProject', projectPath),
     info: (sessionId: string) => ipcRenderer.invoke('session:info', sessionId),
     update: (sessionId: string, updates: any) => 
       ipcRenderer.invoke('session:update', sessionId, updates),

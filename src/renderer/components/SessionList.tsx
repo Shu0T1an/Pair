@@ -24,6 +24,7 @@ interface SessionListProps {
   onNewSession: (projectPath: string) => void
   onNewSessionInProject: (projectPath: string) => void
   onDeleteSession: (sessionId: string) => void
+  onDeleteAllSessionsInProject: (projectPath: string) => void
   onRenameSession: (sessionId: string, newName: string) => void
   onOpenSettings: () => void
 }
@@ -35,6 +36,7 @@ export function SessionList({
   onNewSession,
   onNewSessionInProject,
   onDeleteSession,
+  onDeleteAllSessionsInProject,
   onRenameSession,
   onOpenSettings,
 }: SessionListProps) {
@@ -131,18 +133,34 @@ export function SessionList({
                     {project.sessions.length}
                   </Badge>
                 </button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="opacity-0 group-hover:opacity-100 h-6 w-6 shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onNewSessionInProject(project.projectPath)
-                  }}
-                  title="新建会话"
-                >
-                  <Plus size={12} />
-                </Button>
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="h-6 w-6 shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onNewSessionInProject(project.projectPath)
+                    }}
+                    title="新建会话"
+                  >
+                    <Plus size={12} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (window.confirm(`确定要删除「${project.projectName}」下的所有会话吗？此操作不可撤销。`)) {
+                        onDeleteAllSessionsInProject(project.projectPath)
+                      }
+                    }}
+                    title="删除该工作区所有会话"
+                  >
+                    <Trash2 size={12} />
+                  </Button>
+                </div>
               </div>
 
               {/* 会话列表 */}
