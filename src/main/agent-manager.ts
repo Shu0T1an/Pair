@@ -24,6 +24,14 @@ interface CustomModelConfig {
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
 }
 
+// 上下文使用情况接口
+export interface ContextUsage {
+  usedTokens: number;      // 已使用的 tokens
+  totalTokens: number;     // 总上下文窗口大小
+  percentage: number;      // 使用百分比 (0-100)
+  lastUsageId?: string;    // 最后一次有 usage 数据的消息 ID
+}
+
 interface CustomProviderConfig {
   baseUrl: string;
   api: string;
@@ -97,6 +105,11 @@ export class AgentManager extends EventEmitter {
       for (const [id, info] of this.sessionMetadata.entries()) {
         metadata[id] = info;
       }
+      // 确保目录存在
+      const dir = path.dirname(this.metadataPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
       fs.writeFileSync(this.metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
     } catch (error) {
       console.error('保存会话元数据失败:', error);
@@ -107,9 +120,6 @@ export class AgentManager extends EventEmitter {
    * 创建新的会话（持久化）
    */
   async createSession(options: { projectPath: string; name?: string; modelId?: string }): Promise<SessionInfo> {
-    // 刷新模型注册表，加载最新的 models.json
-    this.modelRegistry.refresh();
-    
     // 使用 SessionManager.create() 启用持久化
     const sessionManager = SessionManager.create(options.projectPath);
     
@@ -119,27 +129,6 @@ export class AgentManager extends EventEmitter {
       modelRegistry: this.modelRegistry,
       cwd: options.projectPath,
     };
-
-    // 如果指定了模型，从模型注册表中查找并设置
-    if (options.modelId) {
-      const parts = options.modelId.split('/');
-      let model;
-      
-      if (parts.length === 2) {
-        model = this.modelRegistry.find(parts[0], parts[1]);
-      } else {
-        const allModels = this.modelRegistry.getAll();
-        model = allModels.find(m => m.id === options.modelId);
-      }
-
-      if (model) {
-        sessionOptions.model = model;
-        console.log(`已找到模型: ${model.name || model.id}`);
-      } else {
-        console.warn(`未找到指定的模型: ${options.modelId}，将使用默认模型`);
-        console.log(`可用模型: ${this.modelRegistry.getAll().map(m => m.id).join(', ')}`);
-      }
-    }
 
     const { session } = await createAgentSession(sessionOptions);
 
@@ -400,38 +389,48 @@ export class AgentManager extends EventEmitter {
   async deleteSession(sessionId: string): Promise<void> {
     const entry = this.sessions.get(sessionId);
     
-    // 从内存中移除
-    if (entry) {
-      if (entry.unsubscribe) {
-        entry.unsubscribe();
-      }
-      entry.session.dispose();
-      this.sessions.delete(sessionId);
+    // 检查会话是否存在
+    if (!this.sessionMetadata.has(sessionId)) {
+      throw new Error(`会话 ${sessionId} 不存在`);
     }
     
-    // 从元数据中移除
-    this.sessionMetadata.delete(sessionId);
-    this.saveMetadata();
-    this.currentMessageIds.delete(sessionId);
+    try {
+      if (entry) {
+        if (entry.unsubscribe) {
+          entry.unsubscribe();
+        }
+        entry.session.dispose();
+        this.sessions.delete(sessionId);
+      }
+    } finally {
+      // 无论 dispose() 是否失败，都要清理元数据
+      this.sessionMetadata.delete(sessionId);
+      this.saveMetadata();
+      this.currentMessageIds.delete(sessionId);
+    }
   }
 
   /**
    * 删除所有会话
    */
   async deleteAllSessions(): Promise<void> {
+    // 清空元数据（先清理，确保即使 dispose 失败也不留脏数据）
+    this.sessionMetadata.clear();
+    this.saveMetadata();
+    
     // 清理所有内存中的会话
     for (const [sessionId, entry] of this.sessions.entries()) {
-      if (entry.unsubscribe) {
-        entry.unsubscribe();
+      try {
+        if (entry.unsubscribe) {
+          entry.unsubscribe();
+        }
+        entry.session.dispose();
+      } catch (error) {
+        console.error(`销毁会话 ${sessionId} 时失败:`, error);
       }
-      entry.session.dispose();
       this.currentMessageIds.delete(sessionId);
     }
     this.sessions.clear();
-    
-    // 清空元数据
-    this.sessionMetadata.clear();
-    this.saveMetadata();
   }
 
   /**
@@ -447,21 +446,28 @@ export class AgentManager extends EventEmitter {
       }
     }
     
-    // 删除这些会话
+    // 从元数据中移除（先清理，确保即使 dispose 失败也不留脏数据）
+    for (const sessionId of sessionIdsToDelete) {
+      this.sessionMetadata.delete(sessionId);
+    }
+    this.saveMetadata();
+    
+    // 清理内存中的会话
     for (const sessionId of sessionIdsToDelete) {
       const entry = this.sessions.get(sessionId);
       if (entry) {
-        if (entry.unsubscribe) {
-          entry.unsubscribe();
+        try {
+          if (entry.unsubscribe) {
+            entry.unsubscribe();
+          }
+          entry.session.dispose();
+        } catch (error) {
+          console.error(`销毁会话 ${sessionId} 时失败:`, error);
         }
-        entry.session.dispose();
         this.sessions.delete(sessionId);
       }
-      this.sessionMetadata.delete(sessionId);
       this.currentMessageIds.delete(sessionId);
     }
-    
-    this.saveMetadata();
   }
 
   /**
@@ -553,6 +559,7 @@ export class AgentManager extends EventEmitter {
     modelId: string;
     modelName?: string;
     api?: string;
+    contextWindow?: number;  // 新增：支持自定义上下文窗口大小
   }): Model<any> {
     const model: Model<any> = {
       id: config.modelId,
@@ -562,7 +569,7 @@ export class AgentManager extends EventEmitter {
       baseUrl: config.baseUrl,
       reasoning: true,
       input: ['text', 'image'],
-      contextWindow: 128000,
+      contextWindow: config.contextWindow || 128000,  // 使用配置的值或默认 128k
       maxTokens: 16384,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     };
@@ -1093,5 +1100,76 @@ export class AgentManager extends EventEmitter {
     }
     this.sessions.clear();
     this.currentMessageIds.clear();
+  }
+
+  /**
+   * 获取会话的上下文使用情况
+   */
+  getContextUsage(sessionId: string): ContextUsage {
+    const entry = this.sessions.get(sessionId);
+    if (!entry) {
+      return { usedTokens: 0, totalTokens: 128000, percentage: 0 };
+    }
+
+    const session = entry.session;
+    const model = session.model;
+    const totalTokens = model?.contextWindow || 128000;
+
+    // 从消息中提取 usage 数据
+    let usedTokens = 0;
+    let lastUsageId: string | undefined;
+    const messages = session.messages;
+
+    // 从后向前查找最后一条有 usage 的 assistant 消息
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role === 'assistant' && 'usage' in msg) {
+        const usage = (msg as any).usage;
+        if (usage && usage.totalTokens) {
+          usedTokens = usage.totalTokens;
+          lastUsageId = `msg_${sessionId}_${i}`;
+          break;
+        }
+      }
+    }
+
+    // 如果没有 usage 数据，使用启发式估算（字符数 / 4）
+    if (usedTokens === 0) {
+      let totalChars = 0;
+      for (const msg of messages) {
+        // 处理不同类型的消息
+        if ('content' in msg) {
+          const content = msg.content;
+          if (typeof content === 'string') {
+            totalChars += content.length;
+          } else if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === 'text' && block.text) {
+                totalChars += block.text.length;
+              } else if (block.type === 'thinking' && block.thinking) {
+                totalChars += block.thinking.length;
+              }
+            }
+          }
+        }
+        // 处理 BashExecutionMessage
+        if ('command' in msg && typeof msg.command === 'string') {
+          totalChars += msg.command.length;
+        }
+        if ('output' in msg && typeof msg.output === 'string') {
+          totalChars += msg.output.length;
+        }
+      }
+      usedTokens = Math.ceil(totalChars / 4);
+    }
+
+    const percentage = Math.min(100, Math.round((usedTokens / totalTokens) * 100));
+
+    return {
+      usedTokens,
+      totalTokens,
+      percentage,
+      lastUsageId,
+    };
   }
 }

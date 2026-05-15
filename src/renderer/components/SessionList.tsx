@@ -118,10 +118,10 @@ export function SessionList({
           {filteredProjects.map((project) => (
             <div key={project.projectPath} className="mb-2">
               {/* 项目标题 */}
-              <div className="flex items-center group">
+              <div className="grid grid-cols-[1fr_auto] items-center gap-1 group">
                 <button
                   onClick={() => toggleProject(project.projectPath)}
-                  className="flex items-center gap-1.5 flex-1 px-2 py-1.5 rounded-lg text-left transition-colors hover:bg-white/50"
+                  className="flex items-center gap-1.5 min-w-0 px-2 py-1.5 rounded-lg text-left transition-colors hover:bg-white/50"
                 >
                   {expandedProjects.has(project.projectPath) ? (
                     <ChevronDown size={12} className="text-muted-foreground" />
@@ -133,11 +133,11 @@ export function SessionList({
                     {project.sessions.length}
                   </Badge>
                 </button>
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
+                <div className="flex items-center gap-0.5">
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="h-6 w-6 shrink-0"
+                    className="h-6 w-6"
                     onClick={(e) => {
                       e.stopPropagation()
                       onNewSessionInProject(project.projectPath)
@@ -149,7 +149,7 @@ export function SessionList({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                    className="h-6 w-6 text-destructive hover:text-destructive"
                     onClick={(e) => {
                       e.stopPropagation()
                       if (window.confirm(`确定要删除「${project.projectName}」下的所有会话吗？此操作不可撤销。`)) {
@@ -251,14 +251,14 @@ function SessionItem({ session, isActive, onSelect, onDelete, onRename }: Sessio
   return (
     <div
       className={cn(
-        'group flex items-start gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all',
+        'grid grid-cols-[1fr_auto] gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all',
         isActive
           ? 'bg-white/80 shadow-sm border border-border'
           : 'hover:bg-white/50'
       )}
       onClick={onSelect}
     >
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -280,29 +280,40 @@ function SessionItem({ session, isActive, onSelect, onDelete, onRename }: Sessio
 
       {/* 操作菜单 */}
       {!isEditing && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="opacity-0 group-hover:opacity-100 h-6 w-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal size={12} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent sideOffset={5}>
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleStartRename() }}>
-              <Edit3 size={12} />
-              重命名
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onSelect={onDelete}>
-              <Trash2 size={12} />
-              删除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-6 w-6 text-destructive hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (window.confirm(`确定要删除会话「${session.name}」吗？`)) {
+                onDelete()
+              }
+            }}
+            title="删除会话"
+          >
+            <Trash2 size={12} />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="h-6 w-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal size={12} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent sideOffset={5}>
+              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleStartRename() }}>
+                <Edit3 size={12} />
+                重命名
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )}
     </div>
   )

@@ -5,7 +5,13 @@ import { ipcMain } from 'electron';
 
 // 模拟 electron
 vi.mock('electron', () => {
+  const path = require('path');
+  const os = require('os');
+  const mockUserDataPath = path.join(os.tmpdir(), 'pair-test-ipc-' + Date.now());
   return {
+    app: {
+      getPath: vi.fn().mockReturnValue(mockUserDataPath),
+    },
     ipcMain: {
       handle: vi.fn(),
       removeHandler: vi.fn(),
