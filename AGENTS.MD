@@ -80,6 +80,22 @@ interface AgentManager {
 }
 ```
 
+**NotificationManager** - 通知管理器
+```typescript
+// 负责发送系统通知，当应用在后台且 AI 完成回复时弹出通知
+// 主要功能:
+// - 检查窗口状态（是否在后台）
+// - 发送 Windows 系统原生通知
+// - 管理通知配置（启用/禁用、标题、正文）
+// - 处理通知点击事件（聚焦窗口）
+interface NotificationManager {
+  shouldNotify(): boolean;
+  sendNotification(title?: string, body?: string): void;
+  updateConfig(config: Partial<NotificationConfig>): void;
+  getConfig(): NotificationConfig;
+}
+```
+
 **IPC API** - 前后端通信
 ```typescript
 // 请求通道
