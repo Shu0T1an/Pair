@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent - 浅色风格复刻</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f5f5; /* 对应 image_a293bd.jpg 的浅冷灰背景 */
+            color: #333333;
+        }
+        .sidebar-bg { background-color: #ededed; } /* 侧边栏稍深一点的灰色 */
+        .accent-bg { background-color: #1a1a1a; } /* 对应图中新的黑色强调色 */
+        .accent-text { color: #1a1a1a; }
+        .card-bg { background-color: #ffffff; }
+        .input-bg { background-color: #f0f0f0; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .active-tab {
+            background-color: #1a1a1a; /* 选中项变为黑色 */
+            color: white;
+        }
+
+        .border-light { border-color: rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden p-2 gap-2">
+
+    <aside class="w-64 sidebar-bg rounded-2xl flex flex-col p-3 shadow-sm">
+        <div class="flex items-center gap-1 mb-6 bg-white/40 p-1 rounded-xl">
+            <button class="flex-1 py-1.5 px-3 rounded-lg active-tab flex items-center justify-center gap-2 text-sm font-medium">
+                <i data-lucide="bot" class="w-4 h-4"></i> Agent
+            </button>
+            <button class="flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:bg-white/50 transition-all">
+                <i data-lucide="message-square" class="w-4 h-4"></i> Chat
+            </button>
+        </div>
+
+        <div class="flex-1 flex flex-col gap-4 overflow-y-auto no-scrollbar">
+            <div>
+                <div class="flex items-center justify-between px-2 mb-2">
+                    <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">工作区</span>
+                    <i data-lucide="plus" class="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600"></i>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white/80 rounded-xl text-sm mb-1 cursor-pointer shadow-sm">
+                    <i data-lucide="layout" class="w-4 h-4 text-gray-600"></i>
+                    <span class="truncate font-medium">默认工作区</span>
+                </div>
+            </div>
+
+            <div>
+                <button class="w-full flex items-center justify-between bg-white px-3 py-2.5 rounded-xl text-sm border border-gray-200/50 shadow-sm hover:shadow-md transition-all">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-4 h-4 text-gray-400"></i>
+                        <span>新会话</span>
+                    </div>
+                    <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+                </button>
+            </div>
+
+            <div class="mt-2">
+                <div class="flex items-center justify-between px-2 mb-2">
+                    <div class="flex items-center gap-2 text-[11px] font-semibold text-gray-400">
+                        工作中 <span class="bg-gray-300 text-white px-1.5 rounded-full text-[9px]">2</span>
+                    </div>
+                    <span class="text-[10px] text-gray-400">置顶</span>
+                </div>
+                <div class="space-y-1">
+                    <div class="p-2 hover:bg-white/50 rounded-lg cursor-pointer group transition-colors">
+                        <div class="text-sm font-medium flex items-center gap-2">
+                            新 Agent 会话 <span class="text-[9px] bg-gray-200 px-1 rounded text-gray-500">默认</span>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-white/60 rounded-lg cursor-pointer border border-gray-200/30">
+                        <div class="text-sm font-medium flex items-center gap-2">
+                            新 Agent 会话 <span class="text-[9px] bg-gray-200 px-1 rounded text-gray-500">默认</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto pt-4 border-t border-gray-300/40">
+            <div class="flex items-center gap-2 px-2 py-2 mb-2 text-[10px] text-gray-500">
+                <i data-lucide="cpu" class="w-3 h-3"></i> 0 MCP
+                <i data-lucide="zap" class="w-3 h-3 ml-2"></i> 11 Skills
+            </div>
+            <div class="flex items-center justify-between bg-white/60 p-2 rounded-xl border border-white/40">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                        <i data-lucide="user" class="w-5 h-5 text-gray-400"></i>
+                    </div>
+                    <span class="text-sm font-medium">用户</span>
+                </div>
+                <i data-lucide="settings" class="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600"></i>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 bg-white rounded-2xl flex flex-col shadow-sm relative overflow-hidden border border-gray-200/50">
+        <header class="flex items-center border-b border-gray-100 px-4 h-12 gap-6 text-[13px] overflow-x-auto no-scrollbar">
+            <div class="flex items-center gap-2 text-gray-400 whitespace-nowrap">
+                <i data-lucide="file-text" class="w-4 h-4"></i> 新 Agent 会话 <i data-lucide="edit-3" class="w-3 h-3 ml-1"></i>
+            </div>
+            <div class="flex items-center gap-2 text-gray-400 whitespace-nowrap">
+                <i data-lucide="message-circle" class="w-4 h-4"></i> 了解 Proma
+            </div>
+            <div class="flex items-center gap-2 py-3 border-b-2 border-gray-800 font-semibold text-gray-800 whitespace-nowrap">
+                <i data-lucide="bot" class="w-4 h-4"></i> 新 Agent 会话 <i data-lucide="x" class="w-3 h-3 ml-1 cursor-pointer"></i>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-8 max-w-4xl mx-auto w-full no-scrollbar">
+            <div class="flex gap-4">
+                <div class="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 border border-gray-200/50">
+                    <i data-lucide="user" class="w-5 h-5 text-gray-400"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <span class="text-xs font-semibold text-gray-700">用户</span>
+                        <span class="text-[10px] text-gray-400">05/14 18:00</span>
+                    </div>
+                    <div class="inline-block p-3 px-4 bg-gray-100/80 rounded-2xl text-[14px] leading-relaxed border border-gray-200/30">
+                        你是谁
+                    </div>
+                    <div class="mt-2 opacity-0 hover:opacity-100 transition-opacity">
+                        <i data-lucide="copy" class="w-3.5 h-3.5 text-gray-300 cursor-pointer hover:text-gray-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <div class="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
+                    <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <span class="text-[10px] text-gray-400">05/14 18:30</span>
+                    </div>
+                    <div class="text-[14px] leading-relaxed text-gray-600 mb-4 max-w-2xl">
+                        There's an issue with the selected model (mimo-v2.5-pro). It may not exist or you may not have access to it. Run --model to pick a different model.
+                    </div>
+                    <button class="accent-bg text-white text-xs px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-black/80 transition-all shadow-sm">
+                        <i data-lucide="settings" class="w-3.5 h-3.5"></i> 设置
+                    </button>
+                    <div class="mt-4">
+                        <i data-lucide="copy" class="w-3.5 h-3.5 text-gray-300 cursor-pointer hover:text-gray-500"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-white">
+            <div class="max-w-4xl mx-auto w-full">
+                <div class="bg-[#f9f9f9] border border-gray-200/60 p-4 rounded-3xl relative shadow-sm">
+                    <textarea 
+                        placeholder="输入消息... (Enter 发送, Shift+Enter 换行, @ 引用文件, / 调用 Skill, # 调用 MCP, & 引用对话)" 
+                        class="w-full bg-transparent border-none focus:ring-0 text-[14px] resize-none h-20 placeholder-gray-400 leading-relaxed"
+                    ></textarea>
+                    
+                    <div class="flex items-center justify-between mt-2 border-t border-gray-200/50 pt-3">
+                        <div class="flex items-center gap-3">
+                            <button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200/50 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                                <div class="w-3.5 h-3.5 bg-black rounded-sm flex items-center justify-center">
+                                    <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                </div>
+                                mimo-v2.5-pro
+                                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                            </button>
+                            <div class="flex items-center gap-3 text-gray-400 ml-2">
+                                <i data-lucide="zap" class="w-4 h-4 cursor-pointer hover:text-gray-800 transition-colors"></i>
+                                <i data-lucide="code-2" class="w-4 h-4 cursor-pointer hover:text-gray-800 transition-colors"></i>
+                                <i data-lucide="mic" class="w-4 h-4 cursor-pointer hover:text-gray-800 transition-colors"></i>
+                                <i data-lucide="paperclip" class="w-4 h-4 cursor-pointer hover:text-gray-800 transition-colors"></i>
+                                <i data-lucide="folder" class="w-4 h-4 cursor-pointer hover:text-gray-800 transition-colors"></i>
+                                <i data-lucide="eye" class="w-4 h-4 cursor-pointer hover:text-gray-800 transition-colors"></i>
+                            </div>
+                        </div>
+                        <div class="text-gray-300">
+                             <i data-lucide="corner-down-left" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <aside class="w-72 sidebar-bg rounded-2xl flex flex-col p-3 shadow-sm border border-gray-200/20">
+        <div class="flex items-center gap-1 mb-4 bg-white/40 p-1 rounded-xl">
+            <button class="flex-1 py-1.5 rounded-lg active-tab text-[11px] font-semibold">工作区文件</button>
+            <button class="flex-1 py-1.5 rounded-lg text-gray-500 text-[11px] font-medium hover:bg-white/40 transition-all">文件改动</button>
+            <div class="px-2 cursor-pointer"><i data-lucide="maximize-2" class="w-3 h-3 text-gray-400 hover:text-gray-600"></i></div>
+        </div>
+
+        <div class="flex-1 flex flex-col gap-4">
+            <div class="flex items-center justify-between text-[10px] text-gray-500 bg-white/50 px-2 py-1.5 rounded-lg border border-white/50">
+                <span class="flex items-center gap-1 font-medium"><i data-lucide="folder-open" class="w-3 h-3"></i> 会话文件</span>
+                <span class="truncate max-w-[110px] opacity-60">C:\Users\tianshuo...</span>
+                <div class="flex items-center gap-1.5">
+                    <i data-lucide="external-link" class="w-3 h-3 cursor-pointer"></i>
+                    <i data-lucide="rotate-cw" class="w-3 h-3 cursor-pointer"></i>
+                </div>
+            </div>
+
+            <div class="space-y-1 px-1">
+                <div class="flex items-center gap-2 text-sm text-gray-600 py-1.5 cursor-pointer hover:bg-white/30 rounded-md px-1 transition-colors">
+                    <i data-lucide="chevron-right" class="w-3 h-3 text-gray-400"></i>
+                    <i data-lucide="folder" class="w-4 h-4 text-gray-400"></i>
+                    <span>.claude</span>
+                </div>
+                <div class="flex items-center gap-2 text-sm text-gray-600 py-1.5 cursor-pointer hover:bg-white/30 rounded-md px-1 transition-colors">
+                    <i data-lucide="chevron-right" class="w-3 h-3 text-gray-400"></i>
+                    <i data-lucide="folder" class="w-4 h-4 text-gray-400"></i>
+                    <span>.context</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <button class="bg-white/70 p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white transition-all group shadow-sm border border-white/50">
+                    <i data-lucide="plus" class="w-4 h-4 text-gray-400 group-hover:text-gray-800"></i>
+                    <span class="text-[10px] text-gray-500 font-medium">添加文件</span>
+                </button>
+                <button class="bg-white/70 p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white transition-all group shadow-sm border border-white/50">
+                    <i data-lucide="folder-plus" class="w-4 h-4 text-gray-400 group-hover:text-gray-800"></i>
+                    <span class="text-[10px] text-gray-500 font-medium">附加文件夹</span>
+                </button>
+            </div>
+
+            <div class="mt-8 border-t border-gray-300/40 pt-4 flex-1">
+                <div class="flex items-center justify-between text-[10px] text-gray-400 mb-6 px-1">
+                    <span class="flex items-center gap-1"><i data-lucide="layout" class="w-3 h-3"></i> 工作区文件</span>
+                    <i data-lucide="external-link" class="w-3 h-3"></i>
+                </div>
+                
+                <div class="flex flex-col items-center justify-center py-16 text-gray-300">
+                    <div class="text-[13px] font-medium mb-6 text-gray-400">目录为空</div>
+                    <div class="grid grid-cols-2 gap-2 w-full">
+                        <button class="bg-white/40 p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white transition-all group border border-dashed border-gray-300">
+                            <i data-lucide="plus" class="w-4 h-4 text-gray-300 group-hover:text-gray-600"></i>
+                            <span class="text-[9px] text-gray-400">添加文件</span>
+                        </button>
+                        <button class="bg-white/40 p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white transition-all group border border-dashed border-gray-300">
+                            <i data-lucide="folder-plus" class="w-4 h-4 text-gray-300 group-hover:text-gray-600"></i>
+                            <span class="text-[9px] text-gray-400">附加文件夹</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        window.onload = () => {
+            lucide.createIcons();
+            
+            const textarea = document.querySelector('textarea');
+            textarea.addEventListener("input", function() {
+                this.style.height = 'auto';
+                const newHeight = Math.min(this.scrollHeight, 200);
+                this.style.height = newHeight + 'px';
+            }, false);
+        };
+    </script>
+</body>
+</html>

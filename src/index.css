@@ -1,0 +1,324 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
+@import "highlight.js/styles/github.css";
+
+/* 主题变量 - 使用 HSL (参考浅灰色系风格) */
+:root {
+  --background: 0 0% 96%;           /* #f5f5f5 浅冷灰背景 */
+  --foreground: 0 0% 20%;           /* #333333 主文字 */
+  --muted: 0 0% 93%;               /* #ededed 侧边栏/次要背景 */
+  --muted-foreground: 0 0% 60%;     /* gray-500 次要文字 */
+  --border: 0 0% 90%;              /* #e5e5e5 浅灰色边框 */
+  --input: 0 0% 94%;               /* #f0f0f0 输入框背景 */
+  --ring: 0 0% 10%;                /* #1a1a1a 焦点环 */
+  --primary: 0 0% 10%;             /* #1a1a1a 黑色强调 */
+  --primary-foreground: 0 0% 100%; /* white */
+  --secondary: 0 0% 100%;          /* white */
+  --secondary-foreground: 0 0% 10%;
+  --accent: 0 0% 10%;              /* #1a1a1a */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --card: 0 0% 100%;               /* white 卡片 */
+  --card-foreground: 0 0% 20%;
+  --popover: 0 0% 100%;            /* white 弹出菜单 */
+  --popover-foreground: 0 0% 20%;
+  --dialog: 0 0% 100%;
+  --tooltip: 0 0% 10%;
+  --tooltip-foreground: 0 0% 98%;
+  --code-bg: 0 0% 100%;  /* 纯白背景 */
+  --tw-prose-pre-bg: hsl(0, 0%, 100%);  /* Tailwind 代码块背景：纯白 */
+  --sidebar: 0 0% 93%;             /* #ededed 侧边栏 */
+  --sidebar-foreground: 0 0% 20%;
+}
+
+.dark {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --ring: 240 4.9% 83.9%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 5.9% 10%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 240 3.7% 25%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 55% 45%;
+  --destructive-foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --dialog: 240 10% 5%;
+  --tooltip: 240 5% 20%;
+  --tooltip-foreground: 0 0% 98%;
+  --code-bg: 240 20% 8%;  /* 接近黑色的背景 */
+  --tw-prose-pre-bg: hsl(240, 20%, 8%);  /* Tailwind 代码块背景：接近黑色 */
+  --sidebar: 240 5% 8%;
+  --sidebar-foreground: 0 0% 98%;
+}
+
+/* 全局基础样式 */
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* 滚动条样式 */
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* 渐隐遮罩 */
+  .mask-fade-y {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      black 3%,
+      black 97%,
+      transparent 100%
+    );
+  }
+
+  /* 细腻阴影 */
+  .shadow-minimal {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.03),
+      0 1px 3px 0 rgb(0 0 0 / 0.06);
+  }
+
+  .dark .shadow-minimal {
+    box-shadow:
+      0 1px 2px 0 rgb(0 0 0 / 0.2),
+      0 1px 3px 0 rgb(0 0 0 / 0.3);
+  }
+}
+
+/* 代码高亮样式 - 覆盖 highlight.js 和 Tailwind 默认样式 */
+pre code.hljs,
+pre code,
+.prose pre,
+.prose pre code,
+.prose pre code:not([class*="hljs"]) {
+  background: hsl(var(--code-bg)) !important;
+  border: none !important;
+  border-radius: 0.5rem;
+  color: #000000 !important;  /* 强制普通文本为黑色 */
+}
+
+/* 移除 prose 中代码块的默认边框和背景 */
+.prose pre {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 浅色模式下的代码高亮颜色 - 使用高对比度颜色 */
+.hljs,
+.hljs * {
+  color: inherit;  /* 继承父元素颜色 */
+}
+
+.hljs {
+  color: #000000;  /* 纯黑色文字 */
+  background: transparent !important;
+}
+
+/* 确保没有 hljs 类的普通文本也是黑色 */
+.prose pre code:not([class*="hljs"]) {
+  color: #000000 !important;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-type {
+  color: #dc2626;  /* 红色 */
+  font-weight: 600;
+}
+
+.hljs-literal,
+.hljs-number,
+.hljs-tag .hljs-attr,
+.hljs-template-variable,
+.hljs-variable {
+  color: #2563eb;  /* 蓝色 */
+}
+
+.hljs-string,
+.hljs-doctag,
+.hljs-regexp {
+  color: #16a34a;  /* 绿色 */
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-section,
+.hljs-selector-id {
+  color: #9333ea;  /* 紫色 */
+  font-weight: 600;
+}
+
+.hljs-subst {
+  color: #000000;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: #ea580c;  /* 橙色 */
+}
+
+.hljs-link,
+.hljs-meta,
+.hljs-selector-class {
+  color: #2563eb;  /* 蓝色 */
+}
+
+.hljs-built_in,
+.hljs-name {
+  color: #16a34a;  /* 绿色 */
+}
+
+.hljs-attr {
+  color: #2563eb;  /* 蓝色 */
+}
+
+.hljs-params {
+  color: #000000;
+}
+
+.dark .hljs,
+.dark .hljs * {
+  color: inherit;  /* 继承父元素颜色 */
+}
+
+.dark .hljs {
+  color: #ffffff;  /* 纯白色文字 */
+}
+
+/* 深色模式下确保普通文本是白色 */
+.dark .prose pre code:not([class*="hljs"]) {
+  color: #ffffff !important;
+}
+
+.dark pre code.hljs,
+.dark pre code,
+.dark .prose pre,
+.dark .prose pre code,
+.dark .prose pre code:not([class*="hljs"]) {
+  color: #ffffff !important;
+}
+
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-type {
+  color: #f87171;  /* 亮红色 */
+  font-weight: 600;
+}
+
+.dark .hljs-literal,
+.dark .hljs-number,
+.dark .hljs-tag .hljs-attr,
+.dark .hljs-template-variable,
+.dark .hljs-variable {
+  color: #60a5fa;  /* 亮蓝色 */
+}
+
+.dark .hljs-string,
+.dark .hljs-doctag,
+.dark .hljs-regexp {
+  color: #4ade80;  /* 亮绿色 */
+}
+
+.dark .hljs-title,
+.dark .hljs-title.class_,
+.dark .hljs-section,
+.dark .hljs-selector-id {
+  color: #c084fc;  /* 亮紫色 */
+  font-weight: 600;
+}
+
+.dark .hljs-subst {
+  color: #f9fafb;
+}
+
+.dark .hljs-symbol,
+.dark .hljs-bullet {
+  color: #fb923c;  /* 亮橙色 */
+}
+
+.dark .hljs-link,
+.dark .hljs-meta,
+.dark .hljs-selector-class {
+  color: #60a5fa;  /* 亮蓝色 */
+}
+
+.dark .hljs-built_in,
+.dark .hljs-name {
+  color: #4ade80;  /* 亮绿色 */
+}
+
+.dark .hljs-attr {
+  color: #60a5fa;  /* 亮蓝色 */
+}
+
+.dark .hljs-params {
+  color: #f9fafb;
+}
+
+.dark .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+.dark .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
