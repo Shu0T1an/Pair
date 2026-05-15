@@ -1,11 +1,14 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { AgentManager } from './agent-manager.js';
-import type { SessionInfo, ProjectSessions } from '../shared/types.js';
+import { NotificationManager } from './notification.js';
+import type { SessionInfo, ProjectSessions, NotificationConfig } from '../shared/types.js';
+import { DEFAULT_NOTIFICATION_CONFIG } from '../shared/types.js';
 
 export class IPCHandler {
   private agentManager: AgentManager;
   private mainWindow: BrowserWindow | null = null;
   private eventListeners: Map<string, (...args: any[]) => void> = new Map();
+  private notificationManager: NotificationManager | null = null;
 
   constructor(agentManager: AgentManager) {
     this.agentManager = agentManager;
@@ -17,6 +20,7 @@ export class IPCHandler {
    */
   setMainWindow(window: BrowserWindow) {
     this.mainWindow = window;
+    this.notificationManager = new NotificationManager(window);
     this.startEventForwarding();
   }
 
@@ -47,6 +51,11 @@ export class IPCHandler {
         console.log('[IPCHandler] 转发事件:', eventName, args)
         if (this.mainWindow && !this.mainWindow.isDestroyed()) {
           this.mainWindow.webContents.send(`agent:${eventName}`, ...args);
+        }
+        
+        // agent_end 事件时检查是否需要发送系统通知
+        if (eventName === 'agent_end' && this.notificationManager) {
+          this.notificationManager.sendNotification();
         }
       };
       this.agentManager.on(eventName, listener);
@@ -102,6 +111,10 @@ export class IPCHandler {
     ipcMain.handle('window:minimize', this.handleMinimize.bind(this));
     ipcMain.handle('window:maximize', this.handleMaximize.bind(this));
     ipcMain.handle('window:close', this.handleClose.bind(this));
+    
+    // 通知配置
+    ipcMain.handle('notification:getConfig', this.handleGetNotificationConfig.bind(this));
+    ipcMain.handle('notification:updateConfig', this.handleUpdateNotificationConfig.bind(this));
   }
 
   /**
@@ -435,6 +448,25 @@ export class IPCHandler {
   }
 
   /**
+   * 获取通知配置
+   */
+  private handleGetNotificationConfig(): NotificationConfig {
+    if (!this.notificationManager) {
+      return DEFAULT_NOTIFICATION_CONFIG;
+    }
+    return this.notificationManager.getConfig();
+  }
+
+  /**
+   * 更新通知配置
+   */
+  private handleUpdateNotificationConfig(_event: any, config: Partial<NotificationConfig>): void {
+    if (this.notificationManager) {
+      this.notificationManager.updateConfig(config);
+    }
+  }
+
+  /**
    * 清理资源
    */
   dispose() {
@@ -461,5 +493,7 @@ export class IPCHandler {
     ipcMain.removeHandler('window:minimize');
     ipcMain.removeHandler('window:maximize');
     ipcMain.removeHandler('window:close');
+    ipcMain.removeHandler('notification:getConfig');
+    ipcMain.removeHandler('notification:updateConfig');
   }
 }
