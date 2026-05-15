@@ -69,6 +69,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     usage: (sessionId: string) => ipcRenderer.invoke('context:usage', sessionId),
   },
 
+  // 通知配置
+  notification: {
+    getConfig: () => ipcRenderer.invoke('notification:getConfig'),
+    updateConfig: (config: any) => ipcRenderer.invoke('notification:updateConfig', config),
+  },
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = [
