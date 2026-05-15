@@ -75,3 +75,27 @@ export interface AppSettings {
   model: string;
   apiKey?: string;
 }
+
+/**
+ * 通知配置
+ */
+export interface NotificationConfig {
+  /** 是否启用系统通知 */
+  enabled: boolean;
+  /** 通知标题 */
+  title: string;
+  /** 通知正文 */
+  body: string;
+  /** 触发事件类型 */
+  triggerEvent: 'agent_end' | 'message_end';
+}
+
+/**
+ * 默认通知配置
+ */
+export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
+  enabled: true,
+  title: 'Pair',
+  body: 'AI 已完成回复',
+  triggerEvent: 'agent_end',
+};
