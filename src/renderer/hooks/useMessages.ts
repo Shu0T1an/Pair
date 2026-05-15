@@ -32,7 +32,9 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
   // 刷新流缓冲区 - 使用 ref 来避免依赖问题
   const flushStreamBufferRef = useRef<() => void>(() => {})
   
-  flushStreamBufferRef.current = () => {
+  // 在 effect 中更新 ref，避免在渲染期间更新
+  useEffect(() => {
+    flushStreamBufferRef.current = () => {
     if (rafIdRef.current) {
       cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = null
@@ -69,6 +71,7 @@ export function useMessages({ sessionId, messagesCache }: UseMessagesOptions) {
       })
     }
   }
+  }, []) // 空依赖数组，只在挂载时设置一次
 
   // 加载会话消息
   const loadMessages = useCallback(async (sid: string) => {

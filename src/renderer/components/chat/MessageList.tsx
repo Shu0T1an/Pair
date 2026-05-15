@@ -39,7 +39,6 @@ export function MessageList({ messages, modelName, isStreaming }: MessageListPro
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
-  const { settings } = useMessageSettings()
   
   // 监听滚动事件
   const handleScroll = useCallback(() => {
