@@ -82,6 +82,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectFolder: () => ipcRenderer.invoke('storage:selectFolder'),
   },
 
+  // 统计数据
+  stats: {
+    getOverview: () => ipcRenderer.invoke('stats:getOverview'),
+  },
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = [

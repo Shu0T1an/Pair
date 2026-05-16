@@ -13,6 +13,7 @@ import fs from 'fs';
 import type { SessionInfo, ProjectSessions } from '../shared/types';
 import { StorageManager } from './storage-manager.js';
 import { listAllSessions, findSessionFile, readSessionHeader } from './session-scanner.js';
+import { StatsManager } from './stats-manager.js';
 
 // 自定义模型配置接口
 interface CustomModelConfig {
@@ -56,6 +57,7 @@ export class AgentManager extends EventEmitter {
   private authStorage: AuthStorage;
   private modelRegistry: ModelRegistry;
   private storageManager: StorageManager;
+  private statsManager: StatsManager;
   private modelsJsonPath: string;
 
   constructor(storageManager: StorageManager) {
@@ -63,10 +65,18 @@ export class AgentManager extends EventEmitter {
     this.storageManager = storageManager;
     this.authStorage = AuthStorage.create();
     this.modelRegistry = ModelRegistry.create(this.authStorage);
+    this.statsManager = new StatsManager(storageManager.getDataRoot());
     
     // 设置 models.json 路径
     const homeDir = process.env.HOME || process.env.USERPROFILE || '';
     this.modelsJsonPath = path.join(homeDir, '.pi', 'agent', 'models.json');
+  }
+
+  /**
+   * 获取统计管理器
+   */
+  getStatsManager(): StatsManager {
+    return this.statsManager;
   }
 
   /**
@@ -663,15 +673,94 @@ export class AgentManager extends EventEmitter {
   }
 
   /**
-   * 更新会话信息
+   * 更新会话信息（内存 + 文件持久化）
    */
   updateSessionInfo(sessionId: string, updates: Partial<SessionInfo>): void {
     const entry = this.sessions.get(sessionId);
-    if (!entry) {
-      throw new Error(`会话 ${sessionId} 不存在`);
+
+    // 更新内存中的 info
+    if (entry) {
+      entry.info = { ...entry.info, ...updates };
     }
 
-    entry.info = { ...entry.info, ...updates };
+    // 持久化 name 变更到 session 文件
+    if (updates.name !== undefined) {
+      this.persistSessionName(sessionId, updates.name, entry?.info.sessionFile);
+    }
+  }
+
+  /**
+   * 将 session 名称持久化到 .jsonl 文件
+   * 在文件中查找或插入 session_info 行
+   */
+  private persistSessionName(sessionId: string, name: string, sessionFile?: string): void {
+    // 如果没有传入 sessionFile，尝试查找
+    let filePath = sessionFile;
+    if (!filePath) {
+      const sessionsDir = this.storageManager.getSessionsDir();
+      // 同步查找（使用 readdirSync）
+      filePath = this.findSessionFileSync(sessionsDir, sessionId) ?? undefined;
+    }
+
+    if (!filePath || !fs.existsSync(filePath)) {
+      console.warn(`无法找到会话文件进行重命名: ${sessionId}`);
+      return;
+    }
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n');
+      let found = false;
+
+      // 查找并替换已有的 session_info 行
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        try {
+          const entry = JSON.parse(line);
+          if (entry.type === 'session_info') {
+            lines[i] = JSON.stringify({ type: 'session_info', name });
+            found = true;
+            break;
+          }
+        } catch {
+          // 跳过解析失败的行
+        }
+      }
+
+      // 如果没有找到 session_info，在 header 后插入
+      if (!found) {
+        lines.splice(1, 0, JSON.stringify({ type: 'session_info', name }));
+      }
+
+      fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+    } catch (error) {
+      console.error('持久化会话名称失败:', error);
+    }
+  }
+
+  /**
+   * 同步查找 session 文件（用于 persistSessionName）
+   */
+  private findSessionFileSync(sessionsRoot: string, sessionId: string): string | null {
+    if (!fs.existsSync(sessionsRoot)) return null;
+
+    try {
+      const entries = fs.readdirSync(sessionsRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const dirPath = path.join(sessionsRoot, entry.name);
+          const files = fs.readdirSync(dirPath);
+          const jsonlFile = files.find(f => f.endsWith('.jsonl') && f.includes(sessionId));
+          if (jsonlFile) return path.join(dirPath, jsonlFile);
+        } else if (entry.isFile() && entry.name.endsWith('.jsonl') && entry.name.includes(sessionId)) {
+          return path.join(sessionsRoot, entry.name);
+        }
+      }
+    } catch (error) {
+      console.error(`同步查找会话文件失败: ${sessionId}`, error);
+    }
+    return null;
   }
 
   /**
@@ -740,6 +829,29 @@ export class AgentManager extends EventEmitter {
     await entry.session.setModel(model);
     entry.info.model = modelId;
     entry.info.updatedAt = new Date();
+  }
+
+  /**
+   * 采集统计数据
+   */
+  private collectStats(sessionId: string, messages: any[]): void {
+    const records = messages
+      .filter((msg: any) => msg.role === 'assistant' && msg.usage)
+      .map((msg: any) => ({
+        timestamp: new Date().toISOString(),
+        sessionId,
+        model: msg.model || 'unknown',
+        provider: msg.provider || 'unknown',
+        input: msg.usage.input || 0,
+        output: msg.usage.output || 0,
+        cacheRead: msg.usage.cacheRead || 0,
+        cacheWrite: msg.usage.cacheWrite || 0,
+        totalTokens: msg.usage.totalTokens || 0
+      }))
+    
+    if (records.length > 0) {
+      this.statsManager.appendRecords(records)
+    }
   }
 
   /**
@@ -836,6 +948,8 @@ export class AgentManager extends EventEmitter {
             messages: event.messages,
             timestamp: new Date(),
           });
+          // 采集统计数据
+          this.collectStats(sessionId, event.messages);
           break;
 
         case 'turn_start':

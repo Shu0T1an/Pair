@@ -123,6 +123,9 @@ export class IPCHandler {
     ipcMain.handle('storage:getConfig', this.handleGetStorageConfig.bind(this));
     ipcMain.handle('storage:setDataRoot', this.handleSetDataRoot.bind(this));
     ipcMain.handle('storage:selectFolder', this.handleSelectStorageFolder.bind(this));
+    
+    // 统计数据
+    ipcMain.handle('stats:getOverview', this.handleGetStatsOverview.bind(this));
   }
 
   /**
@@ -519,6 +522,19 @@ export class IPCHandler {
   }
 
   /**
+   * 获取统计数据概览
+   */
+  private handleGetStatsOverview() {
+    try {
+      const statsManager = this.agentManager.getStatsManager();
+      return statsManager.getOverview();
+    } catch (error) {
+      console.error('获取统计数据失败:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 清理资源
    */
   dispose() {
@@ -550,5 +566,6 @@ export class IPCHandler {
     ipcMain.removeHandler('storage:getConfig');
     ipcMain.removeHandler('storage:setDataRoot');
     ipcMain.removeHandler('storage:selectFolder');
+    ipcMain.removeHandler('stats:getOverview');
   }
 }
