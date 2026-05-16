@@ -75,11 +75,13 @@
 
 /* 滚动条样式 */
 @layer utilities {
-  .scrollbar-none {
+  .scrollbar-none,
+  .scrollbar-hide {
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  .scrollbar-none::-webkit-scrollbar {
+  .scrollbar-none::-webkit-scrollbar,
+  .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
 

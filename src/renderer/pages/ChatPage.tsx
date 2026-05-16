@@ -1,18 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChatArea } from '@/renderer/components/ChatArea'
 import { SessionList } from '@/renderer/components/SessionList'
 import { Header } from '@/renderer/components/Header'
 import { TitleBar } from '@/renderer/components/TitleBar'
+import { TabBar } from '@/renderer/components/TabBar'
 import { SettingsModal } from '@/renderer/components/SettingsModal'
 import { useSessions } from '@/renderer/hooks/useSessions'
 import { useMessages } from '@/renderer/hooks/useMessages'
 import { useModels } from '@/renderer/hooks/useModels'
+import { useTabState } from '@/renderer/hooks/useTabState'
 import { useTheme } from '@/renderer/contexts/ThemeContext'
 import { useModelContext } from '@/renderer/contexts/ModelContext'
 
 export function ChatPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { isDark, toggleDark } = useTheme()
+  const { addTab, closeTab, getTabSessions } = useTabState()
   
   // 使用 Hooks
   const { 
@@ -51,6 +54,19 @@ export function ChatPage() {
   const currentSession = projects
     .flatMap(p => p.sessions)
     .find(s => s.id === activeSessionId) || null
+  
+  // 所有会话列表
+  const allSessions = projects.flatMap(p => p.sessions)
+  
+  // 标签栏显示的会话列表
+  const tabSessions = getTabSessions(allSessions)
+  
+  // 当切换会话时，自动添加到标签栏
+  useEffect(() => {
+    if (activeSessionId) {
+      addTab(activeSessionId)
+    }
+  }, [activeSessionId, addTab])
   
   // 处理新建会话（从 SessionList 传入已选好的文件夹路径）
   const handleNewSession = async (projectPath?: string) => {
@@ -96,6 +112,18 @@ export function ChatPage() {
             isDark={isDark}
             onToggleTheme={toggleDark}
             onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+          <TabBar
+            tabs={tabSessions}
+            activeSessionId={activeSessionId || undefined}
+            onSelect={selectSession}
+            onClose={(sessionId) => {
+              const nextId = closeTab(sessionId, activeSessionId || undefined)
+              // 如果关闭的是当前活跃标签，切换到下一个标签
+              if (sessionId === activeSessionId && nextId) {
+                selectSession(nextId)
+              }
+            }}
           />
           <ChatArea
             messages={messages}

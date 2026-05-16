@@ -3,11 +3,13 @@ import { ArrowDown } from 'lucide-react'
 import { Button } from '@/renderer/components/ui/button'
 import type { Message } from '@/shared/types'
 import { MessageGroup } from './MessageGroup'
+import { WelcomeView } from './WelcomeView'
 
 interface MessageListProps {
   messages: Message[]
   modelName?: string
   isStreaming?: boolean
+  onSendMessage?: (text: string) => void
 }
 
 interface MessageGroupType {
@@ -34,7 +36,7 @@ function groupMessages(messages: Message[]): MessageGroupType[] {
   return groups
 }
 
-export function MessageList({ messages, modelName, isStreaming }: MessageListProps) {
+export function MessageList({ messages, modelName, isStreaming, onSendMessage }: MessageListProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -119,6 +121,11 @@ export function MessageList({ messages, modelName, isStreaming }: MessageListPro
   
   // 消息分组
   const groups = groupMessages(messages)
+  
+  // 如果没有消息，显示欢迎界面
+  if (messages.length === 0) {
+    return <WelcomeView onSendMessage={onSendMessage} />
+  }
   
   return (
     <div className="relative flex-1 min-h-0 overflow-hidden">

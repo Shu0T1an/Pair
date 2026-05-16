@@ -30,6 +30,7 @@ export function ChatArea({
         messages={messages}
         modelName={currentModel?.name}
         isStreaming={isStreaming}
+        onSendMessage={onSend}
       />
       
       {/* 输入框 */}

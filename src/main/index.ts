@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, session } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 import { AgentManager } from './agent-manager.js';
 import { IPCHandler } from './ipc-handler.js';
@@ -7,6 +7,9 @@ import { IPCHandler } from './ipc-handler.js';
 // app.disableHardwareAcceleration();
 
 const isDev = !app.isPackaged;
+
+// 设置应用 ID（Windows 任务栏图标必须）
+app.setAppUserModelId('com.pair');
 
 let mainWindow: BrowserWindow | null = null;
 const agentManager = new AgentManager();
@@ -29,6 +32,9 @@ function createWindow() {
     },
     backgroundColor: '#1a1a2e',
     show: false,
+    icon: isDev
+      ? path.join(process.cwd(), 'build/icon.ico')
+      : path.join(__dirname, '../../build/icon.ico'),
   });
 
   // 设置 IPC 处理器的主窗口引用
