@@ -164,3 +164,13 @@ export interface OverviewStats {
     monthly: DailyStats[]
   }
 }
+
+// Skill 信息
+export interface SkillInfo {
+  name: string;
+  description: string;
+  filePath: string;
+  baseDir: string;
+  scope: 'user' | 'project' | 'temporary';
+  disableModelInvocation: boolean;
+}
