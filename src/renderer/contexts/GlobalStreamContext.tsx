@@ -2,6 +2,9 @@ import { createContext, useContext, useRef, useCallback, useEffect, useReducer, 
 import { ipcClient } from '@/renderer/ipc-client'
 import type { Message } from '@/shared/types'
 
+// 会话状态类型
+export type UnifiedSessionStatus = 'idle' | 'streaming' | 'completed' | 'error'
+
 // 工具调用状态
 interface ToolCallState {
   id: string
@@ -27,6 +30,9 @@ interface StreamingState {
 interface SessionStreamState {
   streaming: StreamingState
   toolCalls: ToolCallState[]
+  status: UnifiedSessionStatus
+  completedAt?: Date
+  errorAt?: Date
 }
 
 // 订阅回调类型
@@ -42,8 +48,14 @@ interface GlobalStreamContextValue {
   // 检查指定会话是否正在流式输出
   isSessionStreaming: (sessionId: string) => boolean
 
+  // 获取会话状态
+  getSessionStatus: (sessionId: string) => UnifiedSessionStatus
+
   // 清除指定会话的流式状态（消息完成后调用）
   clearStreamState: (sessionId: string) => void
+
+  // 设置会话状态
+  setSessionStatus: (sessionId: string, status: UnifiedSessionStatus) => void
 
   // 获取所有正在流式输出的会话ID
   getStreamingSessionIds: () => string[]
@@ -114,6 +126,7 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
           lastUpdateTime: Date.now(),
         },
         toolCalls: [],
+        status: 'idle',
       })
     }
     return statesRef.current.get(sessionId)!
@@ -141,6 +154,7 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
       state.streaming.textBuffer = ''
       state.streaming.thinkingBuffer = ''
       state.toolCalls = []
+      state.status = 'streaming'
 
       notify(event.sessionId)
     })
@@ -177,6 +191,8 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
         state.streaming.textBuffer = ''
         state.streaming.thinkingBuffer = ''
         state.streaming.isStreaming = false
+        state.status = 'completed'
+        state.completedAt = new Date()
       }
       notify(event.sessionId)
     })
@@ -249,11 +265,29 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
     return statesRef.current.get(sessionId)?.streaming.isStreaming ?? false
   }, [])
 
+  const getSessionStatus = useCallback((sessionId: string): UnifiedSessionStatus => {
+    return statesRef.current.get(sessionId)?.status ?? 'idle'
+  }, [])
+
   const clearStreamState = useCallback((sessionId: string) => {
     console.log('[GlobalStream] 清除流式状态:', sessionId)
-    statesRef.current.delete(sessionId)
+    const state = statesRef.current.get(sessionId)
+    if (state) {
+      state.status = 'idle'
+      state.streaming.message = null
+      state.toolCalls = []
+    }
     notify(sessionId)
   }, [notify])
+
+  const setSessionStatus = useCallback((sessionId: string, status: UnifiedSessionStatus) => {
+    const state = getOrCreateState(sessionId)
+    state.status = status
+    if (status === 'error') {
+      state.errorAt = new Date()
+    }
+    notify(sessionId)
+  }, [getOrCreateState, notify])
 
   const getStreamingSessionIds = useCallback(() => {
     const ids: string[] = []
@@ -269,7 +303,9 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
     getStreamState,
     getStreamingMessage,
     isSessionStreaming,
+    getSessionStatus,
     clearStreamState,
+    setSessionStatus,
     getStreamingSessionIds,
     subscribe,
   }
@@ -291,7 +327,7 @@ export function useGlobalStream() {
 
 // 用于订阅指定会话流式状态变化的 hook
 export function useSessionStream(sessionId: string | null) {
-  const { getStreamState, getStreamingMessage, isSessionStreaming, subscribe } = useGlobalStream()
+  const { getStreamState, getStreamingMessage, isSessionStreaming, getSessionStatus, subscribe } = useGlobalStream()
 
   // 使用 forceUpdate 来触发组件更新
   const [, forceUpdate] = useReducer(x => x + 1, 0)
@@ -308,5 +344,6 @@ export function useSessionStream(sessionId: string | null) {
     streamState: sessionId ? getStreamState(sessionId) : undefined,
     streamingMessage: sessionId ? getStreamingMessage(sessionId) : undefined,
     isStreaming: sessionId ? isSessionStreaming(sessionId) : false,
+    status: sessionId ? getSessionStatus(sessionId) : 'idle',
   }
 }

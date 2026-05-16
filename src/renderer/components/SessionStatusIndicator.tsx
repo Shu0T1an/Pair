@@ -1,46 +1,38 @@
-import type { SessionStatus } from '@/shared/types'
+import { useGlobalStream } from '@/renderer/contexts/GlobalStreamContext'
 import { cn } from '@/renderer/lib/utils'
 
 interface SessionStatusIndicatorProps {
-  status: SessionStatus
+  sessionId: string
   className?: string
 }
 
 /**
- * 会话状态指示器
- * - working: 绿色旋转弧线
+ * 统一的会话状态指示器
+ * - streaming: 蓝色呼吸灯（动画）
  * - completed: 绿色对钩
  * - error: 红色感叹号
  * - idle: 不显示
  */
-export function SessionStatusIndicator({ status, className }: SessionStatusIndicatorProps) {
+export function SessionStatusIndicator({ sessionId, className }: SessionStatusIndicatorProps) {
+  const { getSessionStatus, isSessionStreaming } = useGlobalStream()
+  const status = getSessionStatus(sessionId)
+  const isStreaming = isSessionStreaming(sessionId)
+
+  // idle 状态不显示
   if (status === 'idle') return null
 
   return (
     <div className={cn('flex items-center justify-center w-4 h-4 shrink-0', className)}>
-      {status === 'working' && (
-        <svg
-          className="animate-spin text-green-500"
-          viewBox="0 0 24 24"
-          width={14}
-          height={14}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        >
-          {/* 弧线：约70%的圆，旋转形成扫描效果 */}
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            strokeDasharray="44 18.83"
-            strokeDashoffset="0"
-          />
-        </svg>
+      {/* streaming 状态：蓝色呼吸灯 */}
+      {(status === 'streaming' || isStreaming) && (
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+        </span>
       )}
 
-      {status === 'completed' && (
+      {/* completed 状态：绿色对钩 */}
+      {status === 'completed' && !isStreaming && (
         <svg
           viewBox="0 0 24 24"
           width={14}
@@ -56,7 +48,8 @@ export function SessionStatusIndicator({ status, className }: SessionStatusIndic
         </svg>
       )}
 
-      {status === 'error' && (
+      {/* error 状态：红色感叹号 */}
+      {status === 'error' && !isStreaming && (
         <svg
           viewBox="0 0 24 24"
           width={14}

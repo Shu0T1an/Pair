@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Message } from '@/shared/types'
 import { ipcClient } from '@/renderer/ipc-client'
 import type { ModelConfig } from '@/renderer/contexts/ModelContext'
-import { useSessionState } from '@/renderer/contexts/SessionStateContext'
 import { useGlobalStream } from '@/renderer/contexts/GlobalStreamContext'
 import type { 
   MessageEndEvent,
@@ -20,8 +19,7 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
-  const { updateStatus } = useSessionState()
-  const { getStreamingMessage, isSessionStreaming, clearStreamState, subscribe } = useGlobalStream()
+  const { getStreamingMessage, isSessionStreaming, clearStreamState, subscribe, setSessionStatus } = useGlobalStream()
   
   // 标记当前 effect 是否已清理
   const isCancelledRef = useRef(false)
@@ -63,7 +61,7 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
     
     setMessages(prev => [...prev, userMessage])
     setIsStreaming(true)
-    updateStatus(sessionId, 'working')
+    setSessionStatus(sessionId, 'streaming')
     
     try {
       // 如果当前模型有对应的项目配置，传完整配置对象（走 createCustomModel 路径）
@@ -92,7 +90,7 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
       console.error('发送消息失败:', error)
       setIsStreaming(false)
     }
-  }, [sessionId, currentModelId, modelConfigs, updateStatus])
+  }, [sessionId, currentModelId, modelConfigs, setSessionStatus])
 
   // 中止消息
   const abortMessage = useCallback(async () => {
@@ -101,11 +99,11 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
     try {
       await ipcClient.abortMessage(sessionId)
       setIsStreaming(false)
-      updateStatus(sessionId, 'idle')
+      setSessionStatus(sessionId, 'idle')
     } catch (error) {
       console.error('中止消息失败:', error)
     }
-  }, [sessionId, updateStatus])
+  }, [sessionId, setSessionStatus])
 
   // 切换会话时加载消息
   useEffect(() => {
@@ -172,14 +170,14 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
     // agent_end — 整个 agent 处理完成，更新状态为 completed
     const unsubAgentEnd = ipcClient.onAgentEnd((event: AgentEndEvent) => {
       if (event.sessionId !== sessionId) return
-      updateStatus(sessionId, 'completed')
+      setSessionStatus(sessionId, 'completed')
     })
 
     return () => {
       unsubMessageEnd()
       unsubAgentEnd()
     }
-  }, [sessionId, getStreamingMessage, clearStreamState, updateStatus])
+  }, [sessionId, getStreamingMessage, clearStreamState, setSessionStatus])
 
   // 订阅全局流式状态变化，实时更新消息
   useEffect(() => {
