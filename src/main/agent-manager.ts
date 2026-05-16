@@ -3,6 +3,7 @@ import {
   SessionManager, 
   AuthStorage, 
   ModelRegistry,
+  loadSkills as loadPiSkills,
   type AgentSession,
   type CreateAgentSessionOptions
 } from '@earendil-works/pi-coding-agent';
@@ -77,6 +78,36 @@ export class AgentManager extends EventEmitter {
    */
   getStatsManager(): StatsManager {
     return this.statsManager;
+  }
+
+  /**
+   * 加载所有可用的 skills
+   */
+  async loadSkills(): Promise<any[]> {
+    try {
+      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      const agentDir = path.join(homeDir, '.agents');
+      const cwd = process.cwd();
+      
+      const result = loadPiSkills({
+        cwd,
+        agentDir,
+        skillPaths: [],
+        includeDefaults: true,
+      });
+      
+      return result.skills.map(skill => ({
+        name: skill.name,
+        description: skill.description,
+        filePath: skill.filePath,
+        baseDir: skill.baseDir,
+        scope: skill.sourceInfo?.scope || 'user',
+        disableModelInvocation: skill.disableModelInvocation,
+      }));
+    } catch (error) {
+      console.error('[AgentManager] 加载 skills 失败:', error);
+      return [];
+    }
   }
 
   /**
