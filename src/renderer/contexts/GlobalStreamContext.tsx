@@ -221,13 +221,21 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
     const unsubToolStart = ipcClient.onToolStart((event) => {
       console.log('[GlobalStream] tool_start:', event.sessionId, event.toolName)
       const state = getOrCreateState(event.sessionId)
-      state.toolCalls.push({
-        id: event.toolCallId,
-        name: event.toolName,
-        args: event.args,
-        status: 'running',
-        startTime: new Date(),
-      })
+      
+      // 检查是否已有相同的 toolCall（避免重复添加）
+      const existingIndex = state.toolCalls.findIndex(tc => tc.id === event.toolCallId)
+      if (existingIndex === -1) {
+        state.toolCalls.push({
+          id: event.toolCallId,
+          name: event.toolName,
+          args: event.args,
+          status: 'running',
+          startTime: new Date(),
+        })
+      }
+      
+      console.log('[GlobalStream] toolCalls count:', state.toolCalls.length)
+      console.log('[GlobalStream] has message:', !!state.streaming.message)
       notify(event.sessionId)
     })
 
@@ -269,6 +277,13 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
     const state = statesRef.current.get(sessionId)
     if (!state?.streaming.message) return undefined
 
+    const toolCalls = state.toolCalls.length > 0 ? state.toolCalls.map(tc => ({
+      ...tc,
+      status: tc.status as 'running' | 'success' | 'error',
+    })) : undefined
+    
+    console.log('[GlobalStream] getStreamingMessage - toolCalls:', toolCalls?.length || 0)
+
     // 返回带有当前缓冲区内容和工具调用的消息
     return {
       ...state.streaming.message,
@@ -276,10 +291,7 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
       thinking: state.streaming.thinkingBuffer
         ? (state.streaming.message.thinking || '') + state.streaming.thinkingBuffer
         : state.streaming.message.thinking,
-      toolCalls: state.toolCalls.length > 0 ? state.toolCalls.map(tc => ({
-        ...tc,
-        status: tc.status as 'running' | 'success' | 'error',
-      })) : undefined,
+      toolCalls,
     }
   }, [])
 

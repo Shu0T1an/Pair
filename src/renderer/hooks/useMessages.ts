@@ -190,16 +190,19 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
       
       const streamingMessage = getStreamingMessage(sessionId)
       if (!streamingMessage) return
+      
+      console.log('[useMessages] subscribe callback - toolCalls:', streamingMessage.toolCalls?.length || 0, 'isStreaming:', streamingMessage.isStreaming)
 
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1]
         
-        // 如果最后一条消息是正在流式的助手消息，更新它
-        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+        // 如果最后一条消息是助手消息（无论是否 streaming），更新它
+        // 这样可以确保 toolCalls 被正确添加
+        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.id === streamingMessage.id) {
           return [...prev.slice(0, -1), streamingMessage]
         }
         
-        // 如果最后一条不是流式消息，但有新的流式消息，添加它
+        // 如果有新的流式消息，添加它
         if (streamingMessage.isStreaming && !prev.some(m => m.id === streamingMessage.id)) {
           return [...prev, streamingMessage]
         }
