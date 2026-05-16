@@ -47,7 +47,6 @@ export class StatsManager {
 
   constructor(dataRoot: string) {
     this.statsPath = path.join(dataRoot, 'stats.jsonl')
-    console.log('[StatsManager] 初始化, statsPath:', this.statsPath)
   }
 
   /**
