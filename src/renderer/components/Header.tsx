@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BookOpen,
   Settings,
   Moon,
   Sun,
@@ -73,7 +74,7 @@ export function Header({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon-sm" onClick={onOpenSkills}>
-                  <Zap size={14} />
+                  <BookOpen size={14} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Skills</TooltipContent>

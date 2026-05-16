@@ -66,7 +66,16 @@ interface GlobalStreamContextValue {
 
 const GlobalStreamContext = createContext<GlobalStreamContextValue | null>(null)
 
-// 工具结果转换为字符串
+function extractContentBlocks(content: unknown): string {
+  if (Array.isArray(content)) {
+    return content
+      .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+      .map((b: any) => b.text)
+      .join('')
+  }
+  return JSON.stringify(content, null, 2)
+}
+
 function toolResultToString(result: unknown): string {
   if (typeof result === 'string') {
     return result
@@ -78,6 +87,9 @@ function toolResultToString(result: unknown): string {
     }
     if ('content' in obj && typeof obj.content === 'string') {
       return obj.content
+    }
+    if ('content' in obj && Array.isArray(obj.content)) {
+      return extractContentBlocks(obj.content)
     }
     return JSON.stringify(result, null, 2)
   }

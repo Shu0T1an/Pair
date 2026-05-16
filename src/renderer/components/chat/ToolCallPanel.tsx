@@ -16,13 +16,15 @@ import {
   FolderOpen,
   List,
   Code,
-  Clock
+  Clock,
+  BookOpen
 } from 'lucide-react'
 import { cn } from '@/renderer/lib/utils'
 import type { ToolCall } from '@/shared/types'
+import { MarkdownViewer } from './MarkdownViewer'
 
 // 格式化结果
-function formatResult(result: string | { content?: string; details?: unknown; type?: string; text?: string }): string {
+function formatResult(result: string | { content?: string | unknown[]; details?: unknown; type?: string; text?: string }): string {
   if (typeof result === 'string') {
     return result
   }
@@ -32,6 +34,12 @@ function formatResult(result: string | { content?: string; details?: unknown; ty
     }
     if ('content' in result && typeof result.content === 'string') {
       return result.content
+    }
+    if ('content' in result && Array.isArray(result.content)) {
+      return result.content
+        .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+        .map((b: any) => b.text)
+        .join('')
     }
     return JSON.stringify(result, null, 2)
   }
@@ -144,6 +152,29 @@ function getStatusIcon(status: ToolCall['status']) {
   }
 }
 
+function getReadPath(toolCall: ToolCall): string {
+  return toolCall.args?.path ?? toolCall.args?.file ?? toolCall.args?.filePath ?? ''
+}
+
+function isMarkdownRead(toolCall: ToolCall): boolean {
+  if (toolCall.name !== 'read') return false
+  const path = getReadPath(toolCall)
+  return typeof path === 'string' && path.toLowerCase().endsWith('.md')
+}
+
+function getSkillName(toolCall: ToolCall): string | null {
+  const path = getReadPath(toolCall)
+  if (!path) return null
+  const normalized = path.replace(/\\/g, '/').toLowerCase()
+  if (!normalized.endsWith('skill.md')) return null
+  const marker = '/skills/'
+  const idx = normalized.indexOf(marker)
+  if (idx === -1) return null
+  const after = normalized.slice(idx + marker.length).split('/')
+  after.pop()
+  return after[after.length - 1] || null
+}
+
 export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false }: ToolCallPanelProps) {
   const [isListExpanded, setIsListExpanded] = useState(defaultExpanded)
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null)
@@ -195,6 +226,7 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
             const duration = formatDuration(toolCall.startTime, toolCall.endTime)
             const isSelected = selectedToolId === toolCall.id
             const summary = getToolSummary(toolCall.name, toolCall.args)
+            const skillName = getSkillName(toolCall)
             
             return (
               <div key={toolCall.id}>
@@ -208,13 +240,17 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
                     toolCall.status === 'running' && 'text-blue-500'
                   )}
                 >
-                  {getToolIcon(toolCall.name)}
+                  {skillName ? (
+                    <BookOpen size={14} className="text-purple-500" />
+                  ) : (
+                    getToolIcon(toolCall.name)
+                  )}
                   
                   <span className="font-mono text-xs text-left">
-                    {toolCall.name}
+                    {skillName ? `skill[${skillName}]` : toolCall.name}
                   </span>
                   
-                  {summary && (
+                  {!skillName && summary && (
                     <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
                       {summary}
                     </span>
@@ -277,9 +313,13 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
                             {copiedId === `result-${toolCall.id}` ? <Check size={10} /> : <Copy size={10} />}
                           </button>
                         </div>
-                        <pre className="text-[11px] text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-48 font-mono whitespace-pre-wrap border border-border/50">
-                          {formatResult(toolCall.result)}
-                        </pre>
+                        {isMarkdownRead(toolCall) ? (
+                          <MarkdownViewer content={toolCall.result} title={skillName} />
+                        ) : (
+                          <pre className="text-[11px] text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-48 font-mono whitespace-pre-wrap border border-border/50">
+                            {formatResult(toolCall.result)}
+                          </pre>
+                        )}
                       </div>
                     )}
                     
