@@ -27,7 +27,7 @@ import { cn } from '@/renderer/lib/utils'
 import { ModelModal } from './modals/ModelModal'
 import { useModelContext, type ModelConfig } from '@/renderer/contexts/ModelContext'
 import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
-import { useTheme, themes, fontSizeMap, type FontSize } from '@/renderer/contexts/ThemeContext'
+import { useTheme, themes } from '@/renderer/contexts/ThemeContext'
 import { ipcClient } from '@/renderer/ipc-client'
 import type { NotificationConfig } from '@/shared/types'
 
@@ -484,6 +484,39 @@ function MessageSettings() {
 
   return (
     <div className="space-y-6">
+      <SettingsGroup title="消息宽度">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-muted-foreground">480px</span>
+            <span className="text-sm font-semibold tabular-nums">{settings.messageWidth}px</span>
+            <span className="text-xs text-muted-foreground">1200px</span>
+          </div>
+          <input
+            type="range"
+            min={480}
+            max={1200}
+            step={16}
+            value={settings.messageWidth}
+            onChange={(e) => updateSettings({ messageWidth: Number(e.target.value) })}
+            className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer
+              accent-primary
+              [&::-webkit-slider-thumb]:appearance-none
+              [&::-webkit-slider-thumb]:w-4
+              [&::-webkit-slider-thumb]:h-4
+              [&::-webkit-slider-thumb]:bg-primary
+              [&::-webkit-slider-thumb]:rounded-full
+              [&::-webkit-slider-thumb]:shadow-md
+              [&::-webkit-slider-thumb]:cursor-pointer
+              [&::-webkit-slider-thumb]:transition-transform
+              [&::-webkit-slider-thumb]:hover:scale-110"
+          />
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-muted-foreground">窄</span>
+            <span className="text-xs text-muted-foreground">宽</span>
+          </div>
+        </div>
+      </SettingsGroup>
+
       <SettingsGroup title="消息背景">
         <SettingsItem
           icon={MessageSquare}
@@ -647,36 +680,34 @@ function AppearanceSettings() {
       </SettingsGroup>
 
       <SettingsGroup title="字体大小">
-        <div className="p-4">
-          <div className="flex gap-3">
-            {(Object.keys(fontSizeMap) as FontSize[]).map((size) => (
-              <button
-                key={size}
-                onClick={() => setFontSize(size)}
-                className={cn(
-                  'flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all',
-                  fontSize === size
-                    ? 'border-primary shadow-md bg-primary/5'
-                    : 'border-transparent hover:border-border hover:bg-muted/50'
-                )}
-              >
-                {/* 预览文字 */}
-                <span 
-                  className="font-medium"
-                  style={{ fontSize: fontSizeMap[size].value }}
-                >
-                  {fontSizeMap[size].preview}
-                </span>
-                {/* 大小名称 */}
-                <span className="text-xs font-medium">{fontSizeMap[size].label}</span>
-                {/* 选中指示器 */}
-                {fontSize === size && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                    <Check size={12} className="text-primary-foreground" />
-                  </div>
-                )}
-              </button>
-            ))}
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-muted-foreground">10px</span>
+            <span className="text-sm font-semibold tabular-nums">{fontSize}px</span>
+            <span className="text-xs text-muted-foreground">20px</span>
+          </div>
+          <input
+            type="range"
+            min={10}
+            max={20}
+            step={1}
+            value={fontSize}
+            onChange={(e) => setFontSize(Number(e.target.value))}
+            className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer
+              accent-primary
+              [&::-webkit-slider-thumb]:appearance-none
+              [&::-webkit-slider-thumb]:w-4
+              [&::-webkit-slider-thumb]:h-4
+              [&::-webkit-slider-thumb]:bg-primary
+              [&::-webkit-slider-thumb]:rounded-full
+              [&::-webkit-slider-thumb]:shadow-md
+              [&::-webkit-slider-thumb]:cursor-pointer
+              [&::-webkit-slider-thumb]:transition-transform
+              [&::-webkit-slider-thumb]:hover:scale-110"
+          />
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-muted-foreground">小</span>
+            <span className="text-xs text-muted-foreground">大</span>
           </div>
         </div>
       </SettingsGroup>

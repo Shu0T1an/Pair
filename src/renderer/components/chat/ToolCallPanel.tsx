@@ -19,9 +19,11 @@ import {
   Clock,
   BookOpen
 } from 'lucide-react'
+import { PatchDiff } from '@pierre/diffs/react'
 import { cn } from '@/renderer/lib/utils'
 import type { ToolCall } from '@/shared/types'
 import { MarkdownViewer } from './MarkdownViewer'
+import { useTheme } from '@/renderer/contexts/ThemeContext'
 
 // 格式化结果
 function formatResult(result: string | { content?: string | unknown[]; details?: unknown; type?: string; text?: string }): string {
@@ -109,28 +111,29 @@ function getToolSummary(toolName: string, args?: Record<string, unknown>): strin
 }
 
 // 工具图标映射
-function getToolIcon(toolName: string) {
+function getToolIcon(toolName: string, iconScale: number) {
+  const s = Math.round(14 * iconScale)
   const name = toolName.toLowerCase()
   switch (name) {
     case 'read':
-      return <FileText size={14} className="text-blue-500" />
+      return <FileText size={s} className="text-blue-500" />
     case 'bash':
-      return <Terminal size={14} className="text-green-500" />
+      return <Terminal size={s} className="text-green-500" />
     case 'edit':
-      return <FileEdit size={14} className="text-orange-500" />
+      return <FileEdit size={s} className="text-orange-500" />
     case 'write':
-      return <FilePlus size={14} className="text-purple-500" />
+      return <FilePlus size={s} className="text-purple-500" />
     case 'grep':
-      return <Search size={14} className="text-yellow-500" />
+      return <Search size={s} className="text-yellow-500" />
     case 'find':
-      return <FolderOpen size={14} className="text-cyan-500" />
+      return <FolderOpen size={s} className="text-cyan-500" />
     case 'ls':
-      return <List size={14} className="text-pink-500" />
+      return <List size={s} className="text-pink-500" />
     case 'code':
     case 'code-xml':
-      return <Code size={14} className="text-indigo-500" />
+      return <Code size={s} className="text-indigo-500" />
     default:
-      return <Wrench size={14} className="text-muted-foreground" />
+      return <Wrench size={s} className="text-muted-foreground" />
   }
 }
 
@@ -138,22 +141,24 @@ interface ToolCallPanelProps {
   toolCalls: ToolCall[]
   isStreaming?: boolean
   defaultExpanded?: boolean
+  fontSize?: number
 }
 
-function getStatusIcon(status: ToolCall['status']) {
+function getStatusIcon(status: ToolCall['status'], iconScale: number) {
+  const s = Math.round(12 * iconScale)
   switch (status) {
     case 'pending':
     case 'running':
-      return <Loader2 size={12} className="animate-spin text-blue-500" />
+      return <Loader2 size={s} className="animate-spin text-blue-500" />
     case 'success':
-      return <CheckCircle2 size={12} className="text-green-500" />
+      return <CheckCircle2 size={s} className="text-green-500" />
     case 'error':
-      return <XCircle size={12} className="text-red-500" />
+      return <XCircle size={s} className="text-red-500" />
   }
 }
 
 function getReadPath(toolCall: ToolCall): string {
-  return toolCall.args?.path ?? toolCall.args?.file ?? toolCall.args?.filePath ?? ''
+  return String(toolCall.args?.path ?? toolCall.args?.file ?? toolCall.args?.filePath ?? '')
 }
 
 function isMarkdownRead(toolCall: ToolCall): boolean {
@@ -175,10 +180,110 @@ function getSkillName(toolCall: ToolCall): string | null {
   return after[after.length - 1] || null
 }
 
-export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false }: ToolCallPanelProps) {
+// SDK 自定义 diff 格式 → unified diff 格式转换
+// SDK 格式: +NN content / -NN content /  NN content /   ...
+function customDiffToUnifiedPatch(diff: string, filePath: string): string {
+  if (!diff) return ''
+
+  const lines = diff.split('\n')
+  const result: string[] = [
+    `--- a/${filePath}`,
+    `+++ b/${filePath}`,
+  ]
+
+  type Entry = { type: 'add' | 'del' | 'ctx'; oldLine?: number; newLine?: number; content: string }
+
+  let currentHunk: Entry[] = []
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd()
+    if (!line) continue
+
+    // ... skip marker → hunk boundary
+    if (line.trim() === '...') {
+      if (currentHunk.length > 0) {
+        result.push(...buildHunkFromEntries(currentHunk))
+        currentHunk = []
+      }
+      continue
+    }
+
+    const prefix = line[0]
+    if (prefix !== '+' && prefix !== '-' && prefix !== ' ') continue
+
+    const rest = line.slice(1).trimStart()
+
+    // 提取行号和内容: "<lineNum> <content>"
+    const match = rest.match(/^(\d+)\s+(.*)$/)
+    let content: string
+    let oldLine: number | undefined
+    let newLine: number | undefined
+
+    if (match) {
+      const lineNum = parseInt(match[1], 10)
+      content = match[2]
+      if (prefix === '+') {
+        newLine = lineNum
+      } else if (prefix === '-') {
+        oldLine = lineNum
+      } else {
+        oldLine = lineNum
+        newLine = lineNum
+      }
+    } else {
+      content = rest
+    }
+
+    const type = prefix === '+' ? 'add' as const : prefix === '-' ? 'del' as const : 'ctx' as const
+    currentHunk.push({ type, oldLine, newLine, content })
+  }
+
+  if (currentHunk.length > 0) {
+    result.push(...buildHunkFromEntries(currentHunk))
+  }
+
+  return result.join('\n')
+}
+
+// 构建一个 unified diff hunk 块
+function buildHunkFromEntries(
+  entries: { type: 'add' | 'del' | 'ctx'; oldLine?: number; newLine?: number; content: string }[]
+): string[] {
+  if (entries.length === 0) return []
+
+  const oldStart = entries.find(e => e.oldLine !== undefined)?.oldLine ?? 1
+  const newStart = entries.find(e => e.newLine !== undefined)?.newLine ?? 1
+
+  const ctxCount = entries.filter(e => e.type === 'ctx').length
+  const delCount = entries.filter(e => e.type === 'del').length
+  const addCount = entries.filter(e => e.type === 'add').length
+
+  const oldCount = ctxCount + delCount
+  const newCount = ctxCount + addCount
+
+  const body = entries.map(e => {
+    if (e.type === 'ctx') return ` ${e.content}`
+    if (e.type === 'del') return `-${e.content}`
+    return `+${e.content}`
+  })
+
+  return [`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`, ...body]
+}
+
+// 从工具调用参数中提取文件路径
+function getEditFilePath(toolCall: ToolCall): string {
+  return (toolCall.args?.path as string) || (toolCall.args?.file as string) || 'file'
+}
+
+export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false, fontSize }: ToolCallPanelProps) {
   const [isListExpanded, setIsListExpanded] = useState(defaultExpanded)
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const { isDark } = useTheme()
+  const iconScale = fontSize ? fontSize / 14 : 1
+  const s14 = Math.round(14 * iconScale)
+  const s12 = Math.round(12 * iconScale)
+  const s10 = Math.round(10 * iconScale)
   
   const handleCopy = (content: string, id: string) => {
     navigator.clipboard.writeText(content)
@@ -190,13 +295,13 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
   const errorCount = toolCalls.filter(tc => tc.status === 'error').length
   
   return (
-    <div className="mb-0">
+    <div className="mb-0" style={fontSize ? { fontSize: `${fontSize}px` } : undefined}>
       {/* 第一层：概要 */}
       <button
         onClick={() => setIsListExpanded(!isListExpanded)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
       >
-        <Wrench size={14} className={cn(isStreaming && runningCount > 0 && 'animate-pulse')} />
+        <Wrench size={s14} className={cn(isStreaming && runningCount > 0 && 'animate-pulse')} />
         <span>已调用 {toolCalls.length} 个工具</span>
         
         {isStreaming && runningCount > 0 && (
@@ -211,7 +316,7 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
         )}
         
         <ChevronDown 
-          size={12} 
+          size={s12} 
           className={cn(
             'transition-transform',
             isListExpanded && 'rotate-180'
@@ -231,42 +336,42 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
             return (
               <div key={toolCall.id}>
                 {/* 工具项 */}
-                <button
-                  onClick={() => setSelectedToolId(isSelected ? null : toolCall.id)}
-                  className={cn(
-                    'w-full flex items-center gap-2 py-1 text-sm transition-colors rounded',
-                    'hover:bg-muted/50 px-1.5',
-                    isSelected && 'bg-muted/50',
-                    toolCall.status === 'running' && 'text-blue-500'
-                  )}
-                >
+                  <button
+                    onClick={() => setSelectedToolId(isSelected ? null : toolCall.id)}
+                    className={cn(
+                      'w-full flex items-center gap-2 py-1 transition-colors rounded',
+                      'hover:bg-muted/50 px-1.5',
+                      isSelected && 'bg-muted/50',
+                      toolCall.status === 'running' && 'text-blue-500'
+                    )}
+                  >
                   {skillName ? (
-                    <BookOpen size={14} className="text-purple-500" />
+                    <BookOpen size={s14} className="text-purple-500" />
                   ) : (
-                    getToolIcon(toolCall.name)
+                    getToolIcon(toolCall.name, iconScale)
                   )}
                   
-                  <span className="font-mono text-xs text-left">
+                  <span className="font-mono text-left">
                     {skillName ? `skill[${skillName}]` : toolCall.name}
                   </span>
                   
                   {!skillName && summary && (
-                    <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                    <span className="text-muted-foreground truncate max-w-[200px]">
                       {summary}
                     </span>
                   )}
                   
-                  {duration && (
-                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                      <Clock size={10} />
-                      {duration}
-                    </span>
-                  )}
+                    {duration && (
+                      <span className="flex items-center gap-0.5 text-muted-foreground">
+                        <Clock size={s10} />
+                        {duration}
+                      </span>
+                    )}
                   
-                  {getStatusIcon(toolCall.status)}
+                  {getStatusIcon(toolCall.status, iconScale)}
                   
                   <ChevronRight 
-                    size={10} 
+                    size={s10} 
                     className={cn(
                       'transition-transform text-muted-foreground',
                       isSelected && 'rotate-90'
@@ -275,8 +380,8 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
                 </button>
                 
                 {/* 第三层：工具详情 */}
-                {isSelected && (
-                  <div className="ml-6 mt-1 mb-2 space-y-3 text-xs">
+                  {isSelected && (
+                    <div className="ml-6 mt-1 mb-2 space-y-3">
                     {/* 参数 */}
                     {toolCall.args && Object.keys(toolCall.args).length > 0 && (
                       <div>
@@ -289,10 +394,10 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
                             }}
                             className="text-muted-foreground hover:text-foreground"
                           >
-                            {copiedId === `args-${toolCall.id}` ? <Check size={10} /> : <Copy size={10} />}
+                            {copiedId === `args-${toolCall.id}` ? <Check size={s10} /> : <Copy size={s10} />}
                           </button>
                         </div>
-                        <pre className="text-[11px] text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-32 font-mono border border-border/50">
+                        <pre className="text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-32 font-mono border border-border/50">
                           {JSON.stringify(toolCall.args, null, 2)}
                         </pre>
                       </div>
@@ -310,13 +415,24 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
                             }}
                             className="text-muted-foreground hover:text-foreground"
                           >
-                            {copiedId === `result-${toolCall.id}` ? <Check size={10} /> : <Copy size={10} />}
+                            {copiedId === `result-${toolCall.id}` ? <Check size={s10} /> : <Copy size={s10} />}
                           </button>
                         </div>
-                        {isMarkdownRead(toolCall) ? (
+                        {toolCall.name === 'edit' && toolCall.details?.diff ? (
+                          <div className="rounded-md border border-border/50 max-h-96 overflow-y-auto scrollbar-thin">
+                            <PatchDiff
+                              patch={customDiffToUnifiedPatch(toolCall.details.diff, getEditFilePath(toolCall))}
+                              options={{
+                                themeType: isDark ? 'dark' : 'light',
+                                disableLineNumbers: false,
+                                overflow: 'scroll',
+                              }}
+                            />
+                          </div>
+                        ) : isMarkdownRead(toolCall) ? (
                           <MarkdownViewer content={toolCall.result} title={skillName} />
                         ) : (
-                          <pre className="text-[11px] text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-48 font-mono whitespace-pre-wrap border border-border/50">
+                          <pre className="text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-48 font-mono whitespace-pre-wrap border border-border/50">
                             {formatResult(toolCall.result)}
                           </pre>
                         )}
@@ -327,7 +443,7 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false 
                     {toolCall.error && (
                       <div>
                         <div className="text-red-500 font-medium mb-1">错误</div>
-                        <pre className="text-[11px] text-red-500 bg-red-500/10 p-2 rounded-md overflow-x-auto max-h-32 font-mono border border-red-500/30">
+                        <pre className="text-red-500 bg-red-500/10 p-2 rounded-md overflow-x-auto max-h-32 font-mono border border-red-500/30">
                           {formatResult(toolCall.error)}
                         </pre>
                       </div>

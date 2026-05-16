@@ -59,7 +59,7 @@ export interface ToolUpdateEvent {
 export interface ToolEndEvent {
   sessionId: string;
   toolCallId: string;
-  result: string;
+  result: any;
   isError: boolean;
   timestamp: Date;
 }

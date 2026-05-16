@@ -58,3 +58,6 @@ docs/plans/
 
 pic/
 docs/.sisyphus/
+.sisyphus/
+diff-demo.html
+hello.md

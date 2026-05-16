@@ -13,6 +13,7 @@ interface ToolCallState {
   status: 'running' | 'success' | 'error'
   result?: string
   error?: string
+  details?: { diff?: string; firstChangedLine?: number }
   startTime: Date
   endTime?: Date
 }
@@ -259,6 +260,16 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
         const toolCall = state.toolCalls.find(tc => tc.id === event.toolCallId)
         if (toolCall) {
           toolCall.status = event.isError ? 'error' : 'success'
+          
+          // 提取 details.diff（编辑工具会返回 unified diff 字符串）
+          const result = event.result as any
+          if (result?.details?.diff) {
+            toolCall.details = {
+              diff: result.details.diff,
+              firstChangedLine: result.details.firstChangedLine,
+            }
+          }
+          
           toolCall.result = toolResultToString(event.result)
           toolCall.error = event.isError ? toolCall.result : undefined
           toolCall.endTime = new Date()
@@ -292,6 +303,7 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
     const toolCalls = state.toolCalls.length > 0 ? state.toolCalls.map(tc => ({
       ...tc,
       status: tc.status as 'running' | 'success' | 'error',
+      details: tc.details,
     })) : undefined
     
     console.log('[GlobalStream] getStreamingMessage - toolCalls:', toolCalls?.length || 0)

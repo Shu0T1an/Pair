@@ -1,3 +1,4 @@
+import { useTheme } from '@/renderer/contexts/ThemeContext'
 import type { Message, ModelInfo } from '@/shared/types'
 import { MessageList } from './chat/MessageList'
 import { ChatInput } from './chat/ChatInput'
@@ -23,6 +24,7 @@ export function ChatArea({
   onAbort,
   onSelectModel,
 }: ChatAreaProps) {
+  const { fontSize } = useTheme()
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* 消息列表 */}
@@ -31,6 +33,7 @@ export function ChatArea({
         modelName={currentModel?.name}
         isStreaming={isStreaming}
         onSendMessage={onSend}
+        fontSize={fontSize}
       />
       
       {/* 输入框 */}

@@ -23,6 +23,9 @@ Pair/
 │   │   ├── ipc-handler.ts           # IPC 通信处理
 │   │   ├── preload.ts               # preload 脚本 (contextBridge)
 │   │   ├── notification.ts          # 通知管理器
+│   │   ├── stats-manager.ts         # 统计管理器（Token 用量）
+│   │   ├── storage-manager.ts       # 存储路径管理
+│   │   ├── session-scanner.ts       # 会话文件扫描器
 │   │   └── __tests__/               # 主进程测试
 │   ├── renderer/                    # 渲染进程（前端）
 │   │   ├── index.tsx                # 渲染进程入口
@@ -36,6 +39,8 @@ Pair/
 │   │   │   ├── Header.tsx           # 顶部导航
 │   │   │   ├── TitleBar.tsx         # 窗口标题栏
 │   │   │   ├── SettingsModal.tsx     # 设置弹窗
+│   │   │   ├── SkillsModal.tsx      # 技能管理弹窗
+│   │   │   ├── StatsModal.tsx       # 统计面板弹窗
 │   │   │   ├── TabBar.tsx           # 标签栏
 │   │   │   ├── TabItem.tsx          # 标签项
 │   │   │   ├── SessionStatusIndicator.tsx # 会话状态指示器
@@ -45,9 +50,19 @@ Pair/
 │   │   │   │   ├── MessageList.tsx   # 消息列表
 │   │   │   │   ├── MessageGroup.tsx  # 消息组
 │   │   │   │   ├── ThinkingBlock.tsx # 思考块
-│   │   │   │   └── ToolCallPanel.tsx # 工具调用面板
+│   │   │   │   ├── ToolCallPanel.tsx # 工具调用面板
+│   │   │   │   ├── WelcomeView.tsx  # 欢迎视图
+│   │   │   │   └── MarkdownViewer.tsx # Markdown 渲染器
 │   │   │   ├── modals/
 │   │   │   │   └── ModelModal.tsx    # 模型管理弹窗（添加/编辑）
+│   │   │   ├── skills/              # 技能组件
+│   │   │   │   └── SkillItem.tsx    # 技能列表项
+│   │   │   ├── stats/               # 统计组件
+│   │   │   │   ├── HeatmapChart.tsx  # 热力图
+│   │   │   │   ├── TrendChart.tsx    # 趋势图
+│   │   │   │   ├── ModelPieChart.tsx # 模型饼图
+│   │   │   │   ├── StatsOverview.tsx # 统计概览
+│   │   │   │   └── TokenBreakdown.tsx # Token 细分
 │   │   │   └── ui/                  # 基础 UI 组件
 │   │   │       ├── button.tsx
 │   │   │       ├── dropdown-menu.tsx
@@ -115,6 +130,18 @@ Pair/
 │  - 系统通知（后台完成回复时）                 │
 │  - 通知配置管理                              │
 ├─────────────────────────────────────────────┤
+│  Stats Manager (stats-manager.ts)            │
+│  - Token 用量统计                             │
+│  - JSONL 数据采集 + 聚合查询                 │
+├─────────────────────────────────────────────┤
+│  Storage Manager (storage-manager.ts)        │
+│  - 自定义数据存储路径                         │
+│  - 配置持久化                                │
+├─────────────────────────────────────────────┤
+│  Session Scanner (session-scanner.ts)        │
+│  - 扫描磁盘上的 session 文件                  │
+│  - 解析 session 元数据                        │
+├─────────────────────────────────────────────┤
 │  pi SDK 核心                                 │
 │  - AgentSession, SessionManager, ModelReg.   │
 └─────────────────────────────────────────────┘
@@ -167,6 +194,28 @@ interface NotificationManager {
 }
 ```
 
+**StatsManager** - 统计管理器
+```typescript
+// 记录和聚合 Token 使用统计数据
+// 数据以 JSONL 格式追加存储在 stats.jsonl
+interface StatsManager {
+  record(data: Omit<StatsRecord, 'timestamp'>): void;
+  getOverview(): OverviewStats;
+}
+```
+
+**StorageManager** - 存储管理器
+```typescript
+// 管理自定义数据存储路径
+// 配置保存在 userData/storage-config.json
+interface StorageManager {
+  getDataRoot(): string;
+  setDataRoot(path: string): void;
+  getSessionsPath(): string;
+  resetToDefault(): void;
+}
+```
+
 **IPC API** — 前后端通信（preload 白名单）
 
 | 通道 | 方向 | 说明 |
@@ -194,6 +243,11 @@ interface NotificationManager {
 | `window:minimize/maximize/close` | → | 窗口控制 |
 | `notification:getConfig` | → | 获取通知配置 |
 | `notification:updateConfig` | → | 更新通知配置 |
+| `stats:overview` | → | 获取统计概览 |
+| `stats:record` | → | 记录 Token 使用 |
+| `skills:list` | → | 列出可用技能 |
+| `storage:getConfig` | → | 获取存储配置 |
+| `storage:setConfig` | → | 设置存储路径 |
 | `agent:message_start/text_delta/thinking_delta/message_end` | ← | 消息流式事件 |
 | `agent:tool_start/tool_update/tool_end` | ← | 工具调用事件 |
 | `agent:agent_start/agent_end` | ← | Agent 生命周期 |
@@ -335,6 +389,8 @@ npm run package          # 打包
 | `shiki` | 代码语法高亮 |
 | `lucide-react` | 图标库 |
 | `tailwindcss` v4 | CSS 工具类 |
+| `recharts` | 图表库（统计面板） |
+| `react-activity-calendar` | GitHub 风格热力图 |
 
 ### 开发依赖
 
@@ -359,6 +415,9 @@ npm run package          # 打包
 6. **错误处理**: 网络错误重试、认证错误提示登录、会话错误尝试恢复
 7. **标签管理**: 支持多标签页，最多 10 个标签，状态持久化到 localStorage
 8. **通知系统**: 当应用在后台且 AI 完成回复时，发送 Windows 系统原生通知
+9. **统计功能**: 记录每次对话的 Token 使用情况，支持按日/周/月查看趋势
+10. **技能管理**: 支持用户级、项目级和临时技能，可通过 UI 管理
+11. **自定义存储**: 支持自定义数据存储路径，配置保存在 userData/storage-config.json
 
 ## 已知陷阱（Gotchas）
 
@@ -482,9 +541,12 @@ type MessageGroup = { role: 'user' | 'assistant' | 'system'; messages: Message[]
 
 ## 扩展系统
 
-支持两类扩展：
+支持三类扩展：
 - **pi 原生扩展**: 技能、工具、命令
 - **UI 扩展**: 面板、主题、布局
+- **技能系统**: 支持用户级（~/.agents/skills）、项目级（.agents/skills）和临时技能
+  - 通过 `skills:list` IPC 通道获取技能列表
+  - UI 入口: Header 的 Skills 按钮 -> SkillsModal
 
 ## 类型定义
 
@@ -591,6 +653,69 @@ export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   body: 'AI 已完成回复',
   triggerEvent: 'agent_end',
 };
+
+// 存储配置
+export interface StorageConfig {
+  /** 数据根目录 */
+  dataRoot: string;
+  /** sessions 子目录名 */
+  sessionsDir: string;
+}
+
+// 统计记录
+export interface StatsRecord {
+  timestamp: string
+  sessionId: string
+  model: string
+  provider: string
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  totalTokens: number
+}
+
+// 每日统计
+export interface DailyStats {
+  date: string
+  totalTokens: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+// 模型统计
+export interface ModelStats {
+  model: string
+  provider: string
+  totalTokens: number
+  percentage: number
+}
+
+// 统计概览
+export interface OverviewStats {
+  totalTokens: number
+  todayTokens: number
+  totalSessions: number
+  dailyStats: DailyStats[]
+  modelStats: ModelStats[]
+  trendData: {
+    daily: DailyStats[]
+    weekly: DailyStats[]
+    monthly: DailyStats[]
+  }
+}
+
+// Skill 信息
+export interface SkillInfo {
+  name: string;
+  description: string;
+  filePath: string;
+  baseDir: string;
+  scope: 'user' | 'project' | 'temporary';
+  disableModelInvocation: boolean;
+}
 ```
 
 ## 参考文档

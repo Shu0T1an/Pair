@@ -34,6 +34,10 @@ export interface ToolCall {
   error?: string;
   startTime?: Date;
   endTime?: Date;
+  details?: {
+    diff?: string;
+    firstChangedLine?: number;
+  };
 }
 
 // Token 使用情况

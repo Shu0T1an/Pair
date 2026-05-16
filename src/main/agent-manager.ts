@@ -356,13 +356,14 @@ export class AgentManager extends EventEmitter {
     const result: any[] = [];
     
     // 先收集所有 toolResult 消息，按 toolCallId 索引
-    const toolResults = new Map<string, { result: string; isError: boolean }>();
+    const toolResults = new Map<string, { result: string; isError: boolean; details?: { diff?: string; firstChangedLine?: number } }>();
     for (const msg of messages) {
       if (msg.role === 'toolResult') {
         const resultContent = this.extractMessageContent(msg);
         toolResults.set(msg.toolCallId, {
           result: resultContent,
           isError: msg.isError || false,
+          details: msg.details,
         });
       }
     }
@@ -389,6 +390,7 @@ export class AgentManager extends EventEmitter {
             result: toolResult?.result,
             error: toolResult?.isError ? toolResult.result : undefined,
             status: toolResult ? (toolResult.isError ? 'error' : 'success') : 'success',
+            details: toolResult?.details,
           };
         });
         

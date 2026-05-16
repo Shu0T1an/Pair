@@ -4,12 +4,14 @@ import { Button } from '@/renderer/components/ui/button'
 import type { Message } from '@/shared/types'
 import { MessageGroup } from './MessageGroup'
 import { WelcomeView } from './WelcomeView'
+import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
 
 interface MessageListProps {
   messages: Message[]
   modelName?: string
   isStreaming?: boolean
   onSendMessage?: (text: string) => void
+  fontSize?: number
 }
 
 interface MessageGroupType {
@@ -36,7 +38,7 @@ function groupMessages(messages: Message[]): MessageGroupType[] {
   return groups
 }
 
-export function MessageList({ messages, modelName, isStreaming, onSendMessage }: MessageListProps) {
+export function MessageList({ messages, modelName, isStreaming, onSendMessage, fontSize }: MessageListProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -119,6 +121,8 @@ export function MessageList({ messages, modelName, isStreaming, onSendMessage }:
     userScrolledUpRef.current = false
   }, [])
   
+  const { settings } = useMessageSettings()
+
   // 消息分组
   const groups = groupMessages(messages)
   
@@ -132,14 +136,16 @@ export function MessageList({ messages, modelName, isStreaming, onSendMessage }:
       <div 
         ref={viewportRef}
         className="h-full overflow-y-auto px-4 py-6"
+        style={fontSize ? { fontSize: `${fontSize}px` } : undefined}
       >
-        <div className="max-w-3xl mx-auto space-y-6">
+        <div className="mx-auto space-y-6" style={{ maxWidth: settings.messageWidth }}>
           {groups.map((group, index) => (
             <MessageGroup
               key={`${group.messages[0].id}-${index}`}
               role={group.role}
               messages={group.messages}
               modelName={modelName}
+              fontSize={fontSize}
               showTimestamp={
                 group.role === 'assistant' 
                   ? index === groups.length - 1 

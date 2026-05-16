@@ -17,6 +17,9 @@ export interface MessageSettings {
   
   // 时间戳
   showTimestamp: boolean
+
+  // 消息内容宽度 (px)
+  messageWidth: number
 }
 
 // 默认设置
@@ -27,6 +30,7 @@ const defaultSettings: MessageSettings = {
   bubbleStyle: 'modern',
   showStreamingCursor: true,
   showTimestamp: true,
+  messageWidth: 768,
 }
 
 // 本地存储键

@@ -14,6 +14,7 @@ interface MessageGroupProps {
   role: 'user' | 'assistant' | 'system'
   messages: Message[]
   modelName?: string
+  fontSize?: number
   showTimestamp?: boolean
 }
 
@@ -33,7 +34,7 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({
   )
 })
 
-export const MessageGroup = memo(function MessageGroup({ role, messages, modelName, showTimestamp }: MessageGroupProps) {
+export const MessageGroup = memo(function MessageGroup({ role, messages, modelName, fontSize, showTimestamp }: MessageGroupProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const { settings } = useMessageSettings()
   
@@ -57,7 +58,7 @@ export const MessageGroup = memo(function MessageGroup({ role, messages, modelNa
               key={message.id}
               className="group relative bg-primary text-primary-foreground rounded-2xl px-4 py-2"
             >
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div className="whitespace-pre-wrap" style={fontSize ? { fontSize: `${fontSize}px` } : undefined}>{message.content}</div>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -112,13 +113,14 @@ export const MessageGroup = memo(function MessageGroup({ role, messages, modelNa
                     thinking={message.thinking!} 
                     isStreaming={isStreamingMsg}
                     defaultExpanded={settings.thinkingDefaultExpanded}
+                    fontSize={fontSize}
                   />
                 )}
                 
                 <div className={cn('group relative', 'text-foreground px-1', hasContent && 'py-0.5')}>
                   {/* 正文内容 */}
                   {hasContent ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className="prose prose-sm dark:prose-invert max-w-none" style={fontSize ? { fontSize: `${fontSize}px` } : undefined}>
                       <MemoizedMarkdown content={message.content} />
                     </div>
                   ) : isStreamingMsg && !hasThinking && !hasToolCalls ? (
@@ -148,6 +150,7 @@ export const MessageGroup = memo(function MessageGroup({ role, messages, modelNa
                     toolCalls={message.toolCalls!}
                     isStreaming={isStreamingMsg}
                     defaultExpanded={settings.toolCallsDefaultExpanded}
+                    fontSize={fontSize}
                   />
                 )}
               </div>
@@ -170,6 +173,7 @@ export const MessageGroup = memo(function MessageGroup({ role, messages, modelNa
     prevProps.role === nextProps.role &&
     prevProps.messages === nextProps.messages &&
     prevProps.modelName === nextProps.modelName &&
+    prevProps.fontSize === nextProps.fontSize &&
     prevProps.showTimestamp === nextProps.showTimestamp
   )
 })

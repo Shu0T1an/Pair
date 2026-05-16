@@ -273,22 +273,27 @@ export const themes: ThemeColors[] = [
   },
 ]
 
-// 字体大小类型
-export type FontSize = 'small' | 'medium' | 'large'
+export const DEFAULT_FONT_SIZE = 14
+export const MIN_FONT_SIZE = 10
+export const MAX_FONT_SIZE = 20
 
-export const fontSizeMap: Record<FontSize, { label: string; value: string; preview: string }> = {
-  small: { label: '小', value: '13px', preview: 'A' },
-  medium: { label: '中', value: '14px', preview: 'A' },
-  large: { label: '大', value: '16px', preview: 'A' },
+function migrateFontSize(saved: string | null): number {
+  if (!saved) return DEFAULT_FONT_SIZE
+  if (saved === 'small') return 13
+  if (saved === 'medium') return 14
+  if (saved === 'large') return 16
+  const num = parseInt(saved, 10)
+  if (isNaN(num)) return DEFAULT_FONT_SIZE
+  return Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, num))
 }
 
 interface ThemeContextType {
   currentTheme: ThemeName
   isDark: boolean
-  fontSize: FontSize
+  fontSize: number
   setTheme: (theme: ThemeName) => void
   toggleDark: () => void
-  setFontSize: (size: FontSize) => void
+  setFontSize: (size: number) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -304,9 +309,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return saved === 'dark'
   })
 
-  const [fontSize, setFontSize] = useState<FontSize>(() => {
+  const [fontSize, setFontSize] = useState<number>(() => {
     const saved = localStorage.getItem('font-size')
-    return (saved as FontSize) || 'medium'
+    return migrateFontSize(saved)
   })
 
   // 应用主题到 CSS 变量
@@ -336,10 +341,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // 应用字体大小
   useEffect(() => {
     const root = document.documentElement
-    const size = fontSizeMap[fontSize].value
-    root.style.setProperty('--font-size', size)
-    root.style.fontSize = size
-    localStorage.setItem('font-size', fontSize)
+    root.style.setProperty('--chat-font-size', `${fontSize}px`)
+    localStorage.setItem('font-size', String(fontSize))
   }, [fontSize])
 
   const setTheme = (theme: ThemeName) => {
