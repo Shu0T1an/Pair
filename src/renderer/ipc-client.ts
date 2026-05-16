@@ -1,4 +1,4 @@
-import type { SessionInfo, ProjectSessions, NotificationConfig } from '@/shared/types';
+import type { SessionInfo, ProjectSessions, NotificationConfig, OverviewStats } from '@/shared/types';
 
 // 事件数据类型定义
 export interface MessageStartEvent {
@@ -145,6 +145,11 @@ interface ElectronAPI {
     getConfig: () => Promise<{ dataRoot: string; defaultDataRoot: string }>;
     setDataRoot: (newRoot: string) => Promise<{ success: boolean; error?: string }>;
     selectFolder: () => Promise<string | null>;
+  };
+
+  // 统计数据
+  stats: {
+    getOverview: () => Promise<OverviewStats>;
   };
 
   // 事件订阅

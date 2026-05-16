@@ -164,15 +164,3 @@ export interface OverviewStats {
     monthly: DailyStats[]
   }
 }
-
-// ElectronAPI 类型声明
-declare global {
-  interface Window {
-    electronAPI: {
-      // ... 其他 API
-      stats: {
-        getOverview: () => Promise<OverviewStats>
-      }
-    }
-  }
-}

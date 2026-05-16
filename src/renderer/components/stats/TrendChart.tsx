@@ -47,7 +47,7 @@ export function TrendChart({ trendData }: TrendChartProps) {
           <XAxis dataKey="date" fontSize={10} />
           <YAxis fontSize={10} />
           <Tooltip
-            formatter={(value: number) => [`${value.toLocaleString()} tokens`, '使用量']}
+            formatter={(value) => [`${Number(value).toLocaleString()} tokens`, '使用量']}
             labelFormatter={(label) => `日期: ${label}`}
           />
           <Area

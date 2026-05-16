@@ -25,14 +25,14 @@ export function TokenBreakdown({ dailyStats }: TokenBreakdownProps) {
           <XAxis dataKey="date" fontSize={10} />
           <YAxis fontSize={10} />
           <Tooltip
-            formatter={(value: number, name: string) => {
+            formatter={(value, name) => {
               const labels: Record<string, string> = {
                 input: '输入',
                 output: '输出',
                 cacheRead: '缓存读取',
                 cacheWrite: '缓存写入'
               }
-              return [`${value.toLocaleString()} tokens`, labels[name] || name]
+              return [`${Number(value).toLocaleString()} tokens`, labels[String(name)] || name]
             }}
           />
           <Legend

@@ -34,7 +34,7 @@ export function ModelPieChart({ modelStats }: ModelPieChartProps) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number) => [`${value.toLocaleString()} tokens`, '使用量']}
+            formatter={(value) => [`${Number(value).toLocaleString()} tokens`, '使用量']}
           />
           <Legend
             formatter={(value: string) => (

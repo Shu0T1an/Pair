@@ -835,6 +835,17 @@ export class AgentManager extends EventEmitter {
    * 采集统计数据
    */
   private collectStats(sessionId: string, messages: any[]): void {
+    console.log('[StatsManager] collectStats 被调用, sessionId:', sessionId)
+    console.log('[StatsManager] messages 数量:', messages.length)
+    
+    // 打印每条消息的角色和是否有 usage
+    messages.forEach((msg, i) => {
+      console.log(`[StatsManager] message[${i}]: role=${msg.role}, hasUsage=${!!msg.usage}`)
+      if (msg.usage) {
+        console.log(`[StatsManager] usage:`, msg.usage)
+      }
+    })
+    
     const records = messages
       .filter((msg: any) => msg.role === 'assistant' && msg.usage)
       .map((msg: any) => ({
@@ -849,7 +860,9 @@ export class AgentManager extends EventEmitter {
         totalTokens: msg.usage.totalTokens || 0
       }))
     
+    console.log('[StatsManager] 生成的 records:', records.length)
     if (records.length > 0) {
+      console.log('[StatsManager] 写入记录:', records[0])
       this.statsManager.appendRecords(records)
     }
   }
