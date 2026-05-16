@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AgentManager } from '../agent-manager';
+import { StorageManager } from '../storage-manager';
 import path from 'path';
 import os from 'os';
-import fs from 'fs';
 
 // vi.mock 工厂会被 hoist 到文件顶部，所以路径定义必须用 var 确保可用
 var testDir = '';
+var storageManager: StorageManager;
 vi.mock('electron', () => {
   return {
     app: {
@@ -19,23 +20,23 @@ vi.mock('electron', () => {
   };
 });
 
+function createAgentManager(overrideRoot?: string): AgentManager {
+  storageManager = new StorageManager();
+  // 如果传入了 overrideRoot，则设置 dataRoot 到临时目录
+  if (overrideRoot) {
+    storageManager.setDataRoot(overrideRoot);
+  }
+  return new AgentManager(storageManager);
+}
+
 describe('AgentManager', () => {
   beforeEach(() => {
     // 每个测试用例使用独立的 temp 目录
     testDir = path.join(os.tmpdir(), 'pair-agent-test-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
-    // 清理可能的残留文件
-    try {
-      const metadataFile = path.join(testDir, 'session-metadata.json');
-      if (fs.existsSync(metadataFile)) {
-        fs.unlinkSync(metadataFile);
-      }
-    } catch (e) {
-      // ignore
-    }
   });
 
   it('should create a new session', async () => {
-    const manager = new AgentManager();
+    const manager = createAgentManager(testDir);
     const session = await manager.createSession({
       projectPath: '/test/project',
     });
@@ -45,7 +46,7 @@ describe('AgentManager', () => {
   });
 
   it('should list sessions by project', async () => {
-    const manager = new AgentManager();
+    const manager = createAgentManager(testDir);
     
     await manager.createSession({ projectPath: '/project1' });
     await manager.createSession({ projectPath: '/project1' });
@@ -53,12 +54,14 @@ describe('AgentManager', () => {
     
     const sessions = await manager.listSessions();
     expect(sessions).toHaveLength(2);
-    expect(sessions[0].sessions).toHaveLength(2);
-    expect(sessions[1].sessions).toHaveLength(1);
+    const p1 = sessions.find(p => p.projectPath === '/project1');
+    const p2 = sessions.find(p => p.projectPath === '/project2');
+    expect(p1?.sessions).toHaveLength(2);
+    expect(p2?.sessions).toHaveLength(1);
   });
 
   it('should delete a session', async () => {
-    const manager = new AgentManager();
+    const manager = createAgentManager(testDir);
     const session = await manager.createSession({ projectPath: '/test' });
     
     await manager.deleteSession(session.id);
@@ -68,7 +71,7 @@ describe('AgentManager', () => {
   });
 
   it('should throw when deleting non-existent session', async () => {
-    const manager = new AgentManager();
+    const manager = createAgentManager(testDir);
     
     await expect(manager.deleteSession('non-existent')).rejects.toThrow();
   });

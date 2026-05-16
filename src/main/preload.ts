@@ -75,6 +75,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateConfig: (config: any) => ipcRenderer.invoke('notification:updateConfig', config),
   },
 
+  // 存储路径管理
+  storage: {
+    getConfig: () => ipcRenderer.invoke('storage:getConfig'),
+    setDataRoot: (newRoot: string) => ipcRenderer.invoke('storage:setDataRoot', newRoot),
+    selectFolder: () => ipcRenderer.invoke('storage:selectFolder'),
+  },
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = [

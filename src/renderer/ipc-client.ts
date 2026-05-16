@@ -140,6 +140,13 @@ interface ElectronAPI {
     updateConfig: (config: Partial<NotificationConfig>) => Promise<void>;
   };
 
+  // 存储路径管理
+  storage: {
+    getConfig: () => Promise<{ dataRoot: string; defaultDataRoot: string }>;
+    setDataRoot: (newRoot: string) => Promise<{ success: boolean; error?: string }>;
+    selectFolder: () => Promise<string | null>;
+  };
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => () => void;
 
@@ -454,6 +461,41 @@ export class IPCClient {
       return;
     }
     return window.electronAPI.notification.updateConfig(config);
+  }
+
+  // ── 存储路径管理 ──
+
+  /**
+   * 获取存储配置
+   */
+  async getStorageConfig(): Promise<{ dataRoot: string; defaultDataRoot: string }> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，返回默认配置');
+      return { dataRoot: '', defaultDataRoot: '' };
+    }
+    return window.electronAPI.storage.getConfig();
+  }
+
+  /**
+   * 设置数据根目录
+   */
+  async setStorageDataRoot(newRoot: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，跳过设置');
+      return { success: true };
+    }
+    return window.electronAPI.storage.setDataRoot(newRoot);
+  }
+
+  /**
+   * 选择文件夹
+   */
+  async selectStorageFolder(): Promise<string | null> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，返回 null');
+      return null;
+    }
+    return window.electronAPI.storage.selectFolder();
   }
 
   // 便捷事件监听方法

@@ -22,6 +22,7 @@ Pair/
 │   │   ├── agent-manager.ts         # Agent 管理器（核心）
 │   │   ├── ipc-handler.ts           # IPC 通信处理
 │   │   ├── preload.ts               # preload 脚本 (contextBridge)
+│   │   ├── notification.ts          # 通知管理器
 │   │   └── __tests__/               # 主进程测试
 │   ├── renderer/                    # 渲染进程（前端）
 │   │   ├── index.tsx                # 渲染进程入口
@@ -35,6 +36,10 @@ Pair/
 │   │   │   ├── Header.tsx           # 顶部导航
 │   │   │   ├── TitleBar.tsx         # 窗口标题栏
 │   │   │   ├── SettingsModal.tsx     # 设置弹窗
+│   │   │   ├── TabBar.tsx           # 标签栏
+│   │   │   ├── TabItem.tsx          # 标签项
+│   │   │   ├── SessionStatusIndicator.tsx # 会话状态指示器
+│   │   │   └── StreamingIndicator.tsx # 流式状态指示器
 │   │   │   ├── chat/                # 聊天子组件
 │   │   │   │   ├── ChatInput.tsx     # 输入框
 │   │   │   │   ├── MessageList.tsx   # 消息列表
@@ -51,11 +56,14 @@ Pair/
 │   │   ├── hooks/
 │   │   │   ├── useSessions.ts        # 会话管理
 │   │   │   ├── useMessages.ts        # 消息/流式
-│   │   │   └── useModels.ts          # 模型切换
+│   │   │   ├── useModels.ts          # 模型切换
+│   │   │   └── useTabState.ts        # 标签状态管理
 │   │   ├── contexts/
 │   │   │   ├── ModelContext.tsx       # 模型配置（localStorage 持久化）
 │   │   │   ├── ThemeContext.tsx       # 主题（7 套预设主题）
-│   │   │   └── MessageSettingsContext.tsx # 消息显示设置
+│   │   │   ├── MessageSettingsContext.tsx # 消息显示设置
+│   │   │   ├── GlobalStreamContext.tsx # 全局流式状态管理
+│   │   │   └── SessionStateContext.tsx # 会话状态管理
 │   │   ├── lib/
 │   │   │   ├── utils.ts              # 工具函数（cn）
 │   │   │   └── mock-data.ts          # 模拟数据
@@ -83,8 +91,12 @@ Pair/
 ┌─────────────────────────────────────────────┐
 │  渲染进程 (React UI)                         │
 │  - ChatPage / SessionList / ChatArea         │
+│  - TabBar / TabItem (标签页管理)             │
+│  - SessionStatusIndicator (状态指示器)       │
 │  - hooks (useSessions/useMessages/useModels) │
+│  - hooks (useTabState 标签状态)              │
 │  - contexts (Model/Theme/MessageSettings)    │
+│  - contexts (GlobalStream/SessionState)      │
 ├─────────────────────────────────────────────┤
 │  preload.ts (contextBridge)                  │
 │  - 暴露 electronAPI 到 window                │
@@ -98,6 +110,10 @@ Pair/
 │  - 会话生命周期、工具调度                     │
 │  - 元数据持久化 (session-metadata.json)      │
 │  - 模型管理 (ModelRegistry ＋ custom models) │
+├─────────────────────────────────────────────┤
+│  Notification Manager (notification.ts)      │
+│  - 系统通知（后台完成回复时）                 │
+│  - 通知配置管理                              │
 ├─────────────────────────────────────────────┤
 │  pi SDK 核心                                 │
 │  - AgentSession, SessionManager, ModelReg.   │
@@ -176,6 +192,8 @@ interface NotificationManager {
 | `dialog:selectFolder` | → | 选择文件夹 |
 | `context:usage` | → | 上下文使用情况 |
 | `window:minimize/maximize/close` | → | 窗口控制 |
+| `notification:getConfig` | → | 获取通知配置 |
+| `notification:updateConfig` | → | 更新通知配置 |
 | `agent:message_start/text_delta/thinking_delta/message_end` | ← | 消息流式事件 |
 | `agent:tool_start/tool_update/tool_end` | ← | 工具调用事件 |
 | `agent:agent_start/agent_end` | ← | Agent 生命周期 |
@@ -206,6 +224,11 @@ const unsub = ipcClient.onToolStart((event) => { ... })
 ### useModels
 - 状态: `models`, `currentModel`, `currentModelId`
 - 方法: `selectModel`, `refreshModels`
+
+### useTabState
+- 状态: `openTabIds` (打开的标签列表)
+- 方法: `addTab`, `closeTab`, `getTabSessions`, `hasTab`
+- 特性: 持久化到 localStorage，最多 MAX_TABS 个标签
 
 ### useGlobalStream
 - 状态: 全局流式消息状态（按 sessionId 索引）
@@ -334,6 +357,8 @@ npm run package          # 打包
 4. **模型管理**: 两种模型来源 — ModelRegistry（.pi/agent/models.json）+ 自定义模型（localStorage）
 5. **工具调用**: UI 需要可视化工具调用状态（执行中/成功/失败）
 6. **错误处理**: 网络错误重试、认证错误提示登录、会话错误尝试恢复
+7. **标签管理**: 支持多标签页，最多 10 个标签，状态持久化到 localStorage
+8. **通知系统**: 当应用在后台且 AI 完成回复时，发送 Windows 系统原生通知
 
 ## 已知陷阱（Gotchas）
 
@@ -460,6 +485,113 @@ type MessageGroup = { role: 'user' | 'assistant' | 'system'; messages: Message[]
 支持两类扩展：
 - **pi 原生扩展**: 技能、工具、命令
 - **UI 扩展**: 面板、主题、布局
+
+## 类型定义
+
+### 核心类型
+
+```typescript
+// 会话信息
+export interface SessionInfo {
+  id: string;
+  name: string;
+  projectPath: string;
+  createdAt: Date;
+  updatedAt: Date;
+  messageCount: number;
+  model: string;
+  summary?: string;
+  sessionFile?: string;  // 会话文件路径（用于持久化）
+}
+
+// 项目会话列表
+export interface ProjectSessions {
+  projectPath: string;
+  projectName: string;
+  sessions: SessionInfo[];
+}
+
+// 消息类型
+export type MessageRole = 'user' | 'assistant' | 'system';
+
+// 工具调用状态
+export type ToolCallStatus = 'pending' | 'running' | 'success' | 'error';
+
+// 工具调用
+export interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+  status: ToolCallStatus;
+  result?: string;
+  error?: string;
+  startTime?: Date;
+  endTime?: Date;
+}
+
+// Token 使用情况
+export interface Usage {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+}
+
+// 消息
+export interface Message {
+  id: string;
+  role: MessageRole;
+  content: string;
+  thinking?: string;  // thinking 内容（Claude 等模型的思考过程）
+  timestamp: Date;
+  toolCalls?: ToolCall[];
+  usage?: Usage;
+  isStreaming?: boolean;
+  streamingStartTime?: Date;  // 流式开始时间
+  streamingEndTime?: Date;    // 流式结束时间
+}
+
+// 模型信息
+export interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  description?: string;
+  contextWindow?: number;  // 上下文窗口大小
+}
+
+// 会话状态
+export type SessionStatus = 'idle' | 'working' | 'completed' | 'error'
+
+// 应用设置
+export interface AppSettings {
+  theme: 'dark' | 'light';
+  fontSize: number;
+  model: string;
+  apiKey?: string;
+}
+
+// 通知配置
+export interface NotificationConfig {
+  /** 是否启用系统通知 */
+  enabled: boolean;
+  /** 通知标题 */
+  title: string;
+  /** 通知正文 */
+  body: string;
+  /** 触发事件类型 */
+  triggerEvent: 'agent_end' | 'message_end';
+}
+
+// 默认通知配置
+export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
+  enabled: true,
+  title: 'Pair',
+  body: 'AI 已完成回复',
+  triggerEvent: 'agent_end',
+};
+```
 
 ## 参考文档
 

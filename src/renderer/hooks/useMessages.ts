@@ -164,12 +164,16 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
       })
       
       setIsStreaming(false)
-      clearStreamState(sessionId)  // 清除全局流式状态
+      // 注意：不在 message_end 清除全局流式状态，
+      // 因为 tool_execution_start/end 事件在 message_end 之后才到达。
+      // 需要保留 streaming.message 以便后续工具调用能被正确附加到消息中。
+      // 清除工作交由 agent_end 处理。
     })
 
-    // agent_end — 整个 agent 处理完成，更新状态为 completed
+    // agent_end — 整个 agent 处理完成，清理流式状态，更新状态为 completed
     const unsubAgentEnd = ipcClient.onAgentEnd((event: AgentEndEvent) => {
       if (event.sessionId !== sessionId) return
+      clearStreamState(sessionId)
       setSessionStatus(sessionId, 'completed')
     })
 

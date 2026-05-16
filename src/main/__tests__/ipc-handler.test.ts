@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IPCHandler } from '../ipc-handler';
 import { AgentManager } from '../agent-manager';
+import { StorageManager } from '../storage-manager';
 import { ipcMain } from 'electron';
 
 // 模拟 electron
@@ -23,11 +24,13 @@ vi.mock('electron', () => {
 describe('IPCHandler', () => {
   let agentManager: AgentManager;
   let ipcHandler: IPCHandler;
+  let storageManager: StorageManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    agentManager = new AgentManager();
-    ipcHandler = new IPCHandler(agentManager);
+    storageManager = new StorageManager();
+    agentManager = new AgentManager(storageManager);
+    ipcHandler = new IPCHandler(agentManager, storageManager);
   });
 
   it('should create IPCHandler instance', () => {

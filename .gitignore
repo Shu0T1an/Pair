@@ -53,3 +53,8 @@ temp/
 
 # Git Worktrees
 .worktrees/
+
+docs/plans/
+
+pic/
+docs/.sisyphus/

@@ -1,17 +1,20 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { AgentManager } from './agent-manager.js';
+import { StorageManager } from './storage-manager.js';
 import { NotificationManager } from './notification.js';
 import type { SessionInfo, ProjectSessions, NotificationConfig } from '../shared/types.js';
 import { DEFAULT_NOTIFICATION_CONFIG } from '../shared/types.js';
 
 export class IPCHandler {
   private agentManager: AgentManager;
+  private storageManager: StorageManager;
   private mainWindow: BrowserWindow | null = null;
   private eventListeners: Map<string, (...args: any[]) => void> = new Map();
   private notificationManager: NotificationManager | null = null;
 
-  constructor(agentManager: AgentManager) {
+  constructor(agentManager: AgentManager, storageManager: StorageManager) {
     this.agentManager = agentManager;
+    this.storageManager = storageManager;
     this.registerHandlers();
   }
 
@@ -115,6 +118,11 @@ export class IPCHandler {
     // 通知配置
     ipcMain.handle('notification:getConfig', this.handleGetNotificationConfig.bind(this));
     ipcMain.handle('notification:updateConfig', this.handleUpdateNotificationConfig.bind(this));
+    
+    // 存储路径管理
+    ipcMain.handle('storage:getConfig', this.handleGetStorageConfig.bind(this));
+    ipcMain.handle('storage:setDataRoot', this.handleSetDataRoot.bind(this));
+    ipcMain.handle('storage:selectFolder', this.handleSelectStorageFolder.bind(this));
   }
 
   /**
@@ -466,6 +474,50 @@ export class IPCHandler {
     }
   }
 
+  // ── 存储路径管理 ──
+
+  private handleGetStorageConfig(): { dataRoot: string; defaultDataRoot: string } {
+    return {
+      dataRoot: this.storageManager.getDataRoot(),
+      defaultDataRoot: this.storageManager.getDefaultDataRoot(),
+    };
+  }
+
+  private async handleSetDataRoot(_event: any, newRoot: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const oldRoot = this.storageManager.getDataRoot();
+      
+      // 迁移数据
+      if (oldRoot !== newRoot) {
+        await this.storageManager.migrateData(oldRoot, newRoot);
+      }
+      
+      // 更新配置
+      this.storageManager.setDataRoot(newRoot);
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('设置存储路径失败:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  private async handleSelectStorageFolder(): Promise<string | null> {
+    if (!this.mainWindow) return null;
+    
+    const result = await dialog.showOpenDialog(this.mainWindow, {
+      properties: ['openDirectory'],
+      title: '选择数据存储位置',
+      buttonLabel: '选择',
+    });
+    
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    
+    return result.filePaths[0];
+  }
+
   /**
    * 清理资源
    */
@@ -495,5 +547,8 @@ export class IPCHandler {
     ipcMain.removeHandler('window:close');
     ipcMain.removeHandler('notification:getConfig');
     ipcMain.removeHandler('notification:updateConfig');
+    ipcMain.removeHandler('storage:getConfig');
+    ipcMain.removeHandler('storage:setDataRoot');
+    ipcMain.removeHandler('storage:selectFolder');
   }
 }

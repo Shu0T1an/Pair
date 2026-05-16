@@ -8,10 +8,11 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import type { Model, Api } from '@earendil-works/pi-ai';
 import { EventEmitter } from 'events';
-import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import type { SessionInfo, ProjectSessions } from '../shared/types';
+import { StorageManager } from './storage-manager.js';
+import { listAllSessions, findSessionFile, readSessionHeader } from './session-scanner.js';
 
 // 自定义模型配置接口
 interface CustomModelConfig {
@@ -49,79 +50,37 @@ interface SessionEntry {
   unsubscribe?: () => void;
 }
 
-// 会话元数据存储文件
-const METADATA_FILE = 'session-metadata.json';
-
 export class AgentManager extends EventEmitter {
   private sessions: Map<string, SessionEntry> = new Map();
   private currentMessageIds: Map<string, string> = new Map();
   private authStorage: AuthStorage;
   private modelRegistry: ModelRegistry;
-  private metadataPath: string;
+  private storageManager: StorageManager;
   private modelsJsonPath: string;
-  private sessionMetadata: Map<string, SessionInfo> = new Map();
 
-  constructor() {
+  constructor(storageManager: StorageManager) {
     super();
+    this.storageManager = storageManager;
     this.authStorage = AuthStorage.create();
     this.modelRegistry = ModelRegistry.create(this.authStorage);
-    
-    // 设置元数据存储路径
-    const userDataPath = app.getPath('userData');
-    this.metadataPath = path.join(userDataPath, METADATA_FILE);
     
     // 设置 models.json 路径
     const homeDir = process.env.HOME || process.env.USERPROFILE || '';
     this.modelsJsonPath = path.join(homeDir, '.pi', 'agent', 'models.json');
-    
-    // 加载已有的会话元数据
-    this.loadMetadata();
-  }
-
-  /**
-   * 加载会话元数据
-   */
-  private loadMetadata(): void {
-    try {
-      if (fs.existsSync(this.metadataPath)) {
-        const data = fs.readFileSync(this.metadataPath, 'utf-8');
-        const metadata = JSON.parse(data);
-        for (const [id, info] of Object.entries(metadata)) {
-          this.sessionMetadata.set(id, info as SessionInfo);
-        }
-        console.log(`加载了 ${this.sessionMetadata.size} 个会话元数据`);
-      }
-    } catch (error) {
-      console.error('加载会话元数据失败:', error);
-    }
-  }
-
-  /**
-   * 保存会话元数据
-   */
-  private saveMetadata(): void {
-    try {
-      const metadata: Record<string, SessionInfo> = {};
-      for (const [id, info] of this.sessionMetadata.entries()) {
-        metadata[id] = info;
-      }
-      // 确保目录存在
-      const dir = path.dirname(this.metadataPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(this.metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
-    } catch (error) {
-      console.error('保存会话元数据失败:', error);
-    }
   }
 
   /**
    * 创建新的会话（持久化）
    */
   async createSession(options: { projectPath: string; name?: string; modelId?: string }): Promise<SessionInfo> {
-    // 使用 SessionManager.create() 启用持久化
-    const sessionManager = SessionManager.create(options.projectPath);
+    // 确保目录存在
+    this.storageManager.ensureDirectories();
+    
+    const sessionDir = this.storageManager.getProjectSessionsDir(options.projectPath);
+    if (!fs.existsSync(sessionDir)) {
+      fs.mkdirSync(sessionDir, { recursive: true });
+    }
+    const sessionManager = SessionManager.create(options.projectPath, sessionDir);
     
     const sessionOptions: CreateAgentSessionOptions = {
       sessionManager,
@@ -137,6 +96,7 @@ export class AgentManager extends EventEmitter {
     const dateStr = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
     const defaultName = `新会话-${dateStr}`;
     
+    const sessionFile = session.sessionManager.getSessionFile();
     const sessionInfo: SessionInfo = {
       id: session.sessionId,
       name: options.name || defaultName,
@@ -145,13 +105,28 @@ export class AgentManager extends EventEmitter {
       updatedAt: now,
       messageCount: 0,
       model: session.model?.id || 'unknown',
-      sessionFile: session.sessionManager.getSessionFile(),
+      sessionFile,
     };
 
-    // 保存到内存和元数据
+    // 写入 session 文件头，确保文件系统中有正确的格式
+    // SDK 的 SessionManager 创建后不会立即写文件，需要用消息后才能写入
+    if (sessionFile) {
+      try {
+        const sessionHeader = JSON.stringify({
+          type: 'session',
+          id: session.sessionId,
+          cwd: options.projectPath,
+          timestamp: sessionInfo.createdAt.toISOString(),
+        });
+        const nameEntry = JSON.stringify({ type: 'session_info', name: sessionInfo.name });
+        fs.writeFileSync(sessionFile, sessionHeader + '\n' + nameEntry + '\n');
+      } catch (error) {
+        console.error('写入 session 文件失败:', error);
+      }
+    }
+
+    // 只保存到内存（不再写 session-metadata.json）
     this.sessions.set(session.sessionId, { session, info: sessionInfo });
-    this.sessionMetadata.set(session.sessionId, sessionInfo);
-    this.saveMetadata();
     this.setupSessionEventHandlers(session.sessionId);
     
     return sessionInfo;
@@ -167,30 +142,52 @@ export class AgentManager extends EventEmitter {
       return entry.session;
     }
 
-    // 从元数据中获取会话信息
-    const metadata = this.sessionMetadata.get(sessionId);
-    if (!metadata || !metadata.sessionFile) {
-      throw new Error(`会话 ${sessionId} 不存在或没有会话文件`);
+    // 从所有会话中查找文件路径
+    const sessionsDir = this.storageManager.getSessionsDir();
+    const sessionFile = await findSessionFile(sessionsDir, sessionId);
+    
+    if (!sessionFile) {
+      throw new Error(`会话 ${sessionId} 不存在`);
     }
 
     // 打开已有的会话文件
-    const sessionManager = SessionManager.open(metadata.sessionFile);
+    const sessionManager = SessionManager.open(sessionFile);
     
     const sessionOptions: CreateAgentSessionOptions = {
       sessionManager,
       authStorage: this.authStorage,
       modelRegistry: this.modelRegistry,
-      cwd: metadata.projectPath,
+      cwd: '',
     };
 
     const { session } = await createAgentSession(sessionOptions);
 
-    // 更新元数据
-    metadata.updatedAt = new Date();
-    metadata.messageCount = session.messages.length;
+    // 从 session 文件读取名称，确保与 listSessions 扫描结果一致
+    let sessionName = '未命名会话';
+    try {
+      const header = await readSessionHeader(sessionFile);
+      if (header?.name) {
+        sessionName = header.name;
+      }
+    } catch (error) {
+      console.error('读取会话名称失败:', error);
+    }
+
+    // 构建 SessionInfo
+    const now = new Date();
+    const info: SessionInfo = {
+      id: session.sessionId,
+      name: sessionName,
+      projectPath: session.sessionManager.getCwd?.() || '',
+      createdAt: now,
+      updatedAt: now,
+      messageCount: session.messages.length,
+      model: session.model?.id || 'unknown',
+      sessionFile: sessionFile,
+    };
 
     // 保存到内存
-    this.sessions.set(sessionId, { session, info: metadata });
+    this.sessions.set(sessionId, { session, info });
     this.setupSessionEventHandlers(sessionId);
     
     return session;
@@ -200,53 +197,101 @@ export class AgentManager extends EventEmitter {
    * 获取当前会话信息
    */
   getSessionInfo(sessionId: string): SessionInfo | undefined {
-    return this.sessions.get(sessionId)?.info || this.sessionMetadata.get(sessionId);
+    return this.sessions.get(sessionId)?.info;
   }
 
   /**
    * 列出所有会话（按项目分组）
    */
   async listSessions(): Promise<ProjectSessions[]> {
-    const projectMap = new Map<string, SessionInfo[]>();
-
-    // 使用元数据（包含持久化的会话）
-    for (const info of this.sessionMetadata.values()) {
-      const sessions = projectMap.get(info.projectPath) || [];
-      sessions.push(info);
-      projectMap.set(info.projectPath, sessions);
+    const sessionsDir = this.storageManager.getSessionsDir();
+    const scannedProjects = await listAllSessions(sessionsDir);
+    
+    // 合并内存中的会话（新创建但可能尚未完全持久化的会话）
+    const projectMap = new Map<string, ProjectSessions>();
+    
+    // 先从扫描结果构建
+    for (const project of scannedProjects) {
+      projectMap.set(project.projectPath, {
+        projectPath: project.projectPath,
+        projectName: project.projectName,
+        sessions: project.sessions.map(s => ({
+          id: s.id,
+          name: s.name || '未命名会话',
+          projectPath: s.cwd,
+          createdAt: s.created,
+          updatedAt: s.modified,
+          messageCount: s.messageCount,
+          model: s.model || 'unknown',
+          sessionFile: s.sessionFile,
+        })),
+      });
     }
-
-    return Array.from(projectMap.entries()).map(([projectPath, sessions]) => ({
-      projectPath,
-      projectName: projectPath.split('/').pop() || projectPath.split('\\').pop() || '',
-      // 按更新时间降序排列，新创建的会话排在最前面
-      sessions: sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
-    }));
+    
+    // 再合并内存中的会话（覆盖扫描结果，确保最新状态）
+    for (const [, entry] of this.sessions) {
+      const { info } = entry;
+      let project = projectMap.get(info.projectPath);
+      if (!project) {
+        const projectName = info.projectPath.split(/[/\\]/).pop() || info.projectPath;
+        project = {
+          projectPath: info.projectPath,
+          projectName,
+          sessions: [],
+        };
+        projectMap.set(info.projectPath, project);
+      }
+      
+      // 替换或添加
+      const existingIndex = project.sessions.findIndex(s => s.id === info.id);
+      if (existingIndex >= 0) {
+        project.sessions[existingIndex] = info;
+      } else {
+        project.sessions.push(info);
+      }
+    }
+    
+    // 排序：项目按最新会话时间降序，会话按更新时间降序
+    const result = Array.from(projectMap.values());
+    for (const project of result) {
+      project.sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    }
+    result.sort((a, b) => {
+      const aLatest = a.sessions[0]?.updatedAt?.getTime() || 0;
+      const bLatest = b.sessions[0]?.updatedAt?.getTime() || 0;
+      return bLatest - aLatest;
+    });
+    
+    return result;
   }
 
   /**
    * 获取会话的历史消息
    */
-  getMessages(sessionId: string): any[] {
+  async getMessages(sessionId: string): Promise<any[]> {
     const entry = this.sessions.get(sessionId);
     if (entry) {
       return this.extractMessagesFromSession(entry.session, sessionId);
     }
     
-    // 会话不在内存中，尝试从文件轻量级读取
-    return this.getMessagesFromFile(sessionId);
+    // 会话不在内存中，从文件系统扫描查找 session 文件
+    return await this.getMessagesFromFile(sessionId);
   }
 
   /**
    * 从会话文件轻量级读取消息（不需要创建完整 AgentSession）
    */
-  getMessagesFromFile(sessionId: string): any[] {
-    const metadata = this.sessionMetadata.get(sessionId);
-    if (!metadata?.sessionFile) return [];
+  async getMessagesFromFile(sessionId: string): Promise<any[]> {
+    const sessionsDir = this.storageManager.getSessionsDir();
+    const sessionFile = await findSessionFile(sessionsDir, sessionId);
+
+    if (!sessionFile) {
+      console.error(`会话文件不存在: ${sessionId}`);
+      return [];
+    }
 
     try {
-      // 使用 SessionManager.open() 打开会话文件，然后使用 buildSessionContext() 获取消息
-      const sessionManager = SessionManager.open(metadata.sessionFile);
+      const sessionManager = SessionManager.open(sessionFile);
       const sessionContext = sessionManager.buildSessionContext();
       return this.convertAgentMessages(sessionContext.messages, sessionId);
     } catch (error) {
@@ -389,24 +434,25 @@ export class AgentManager extends EventEmitter {
   async deleteSession(sessionId: string): Promise<void> {
     const entry = this.sessions.get(sessionId);
     
-    // 检查会话是否存在
-    if (!this.sessionMetadata.has(sessionId)) {
+    if (!entry) {
       throw new Error(`会话 ${sessionId} 不存在`);
     }
     
-    try {
-      if (entry) {
-        if (entry.unsubscribe) {
-          entry.unsubscribe();
-        }
+    // 从内存中移除
+    this.sessions.delete(sessionId);
+    this.currentMessageIds.delete(sessionId);
+    
+    // 删除 session 文件
+    const sessionFile = entry.session.sessionManager.getSessionFile();
+    if (sessionFile && fs.existsSync(sessionFile)) {
+      try {
         entry.session.dispose();
-        this.sessions.delete(sessionId);
+        fs.unlinkSync(sessionFile);
+      } catch (error) {
+        console.error('删除会话文件失败:', error);
       }
-    } finally {
-      // 无论 dispose() 是否失败，都要清理元数据
-      this.sessionMetadata.delete(sessionId);
-      this.saveMetadata();
-      this.currentMessageIds.delete(sessionId);
+    } else {
+      entry.session.dispose();
     }
   }
 
@@ -414,15 +460,16 @@ export class AgentManager extends EventEmitter {
    * 删除所有会话
    */
   async deleteAllSessions(): Promise<void> {
-    // 清空元数据（先清理，确保即使 dispose 失败也不留脏数据）
-    this.sessionMetadata.clear();
-    this.saveMetadata();
-    
     // 清理所有内存中的会话
     for (const [sessionId, entry] of this.sessions.entries()) {
       try {
         if (entry.unsubscribe) {
           entry.unsubscribe();
+        }
+        // 尝试删除文件
+        const sessionFile = entry.session.sessionManager.getSessionFile();
+        if (sessionFile && fs.existsSync(sessionFile)) {
+          fs.unlinkSync(sessionFile);
         }
         entry.session.dispose();
       } catch (error) {
@@ -440,25 +487,23 @@ export class AgentManager extends EventEmitter {
     const sessionIdsToDelete: string[] = [];
     
     // 找出该项目下的所有会话
-    for (const [sessionId, info] of this.sessionMetadata.entries()) {
-      if (info.projectPath === projectPath) {
+    for (const [sessionId, entry] of this.sessions.entries()) {
+      if (entry.info.projectPath === projectPath) {
         sessionIdsToDelete.push(sessionId);
       }
     }
     
-    // 从元数据中移除（先清理，确保即使 dispose 失败也不留脏数据）
-    for (const sessionId of sessionIdsToDelete) {
-      this.sessionMetadata.delete(sessionId);
-    }
-    this.saveMetadata();
-    
-    // 清理内存中的会话
+    // 清理
     for (const sessionId of sessionIdsToDelete) {
       const entry = this.sessions.get(sessionId);
       if (entry) {
         try {
           if (entry.unsubscribe) {
             entry.unsubscribe();
+          }
+          const sessionFile = entry.session.sessionManager.getSessionFile();
+          if (sessionFile && fs.existsSync(sessionFile)) {
+            fs.unlinkSync(sessionFile);
           }
           entry.session.dispose();
         } catch (error) {
@@ -525,10 +570,6 @@ export class AgentManager extends EventEmitter {
     await entry.session.prompt(text);
     entry.info.updatedAt = new Date();
     entry.info.messageCount++;
-    
-    // 保存元数据
-    this.sessionMetadata.set(sessionId, entry.info);
-    this.saveMetadata();
   }
 
   /**
@@ -559,7 +600,7 @@ export class AgentManager extends EventEmitter {
     modelId: string;
     modelName?: string;
     api?: string;
-    contextWindow?: number;  // 新增：支持自定义上下文窗口大小
+    contextWindow?: number;
   }): Model<any> {
     const model: Model<any> = {
       id: config.modelId,
@@ -569,7 +610,7 @@ export class AgentManager extends EventEmitter {
       baseUrl: config.baseUrl,
       reasoning: true,
       input: ['text', 'image'],
-      contextWindow: config.contextWindow || 128000,  // 使用配置的值或默认 128k
+      contextWindow: config.contextWindow || 128000,
       maxTokens: 16384,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     };
@@ -631,10 +672,6 @@ export class AgentManager extends EventEmitter {
     }
 
     entry.info = { ...entry.info, ...updates };
-    
-    // 更新元数据
-    this.sessionMetadata.set(sessionId, entry.info);
-    this.saveMetadata();
   }
 
   /**
@@ -662,21 +699,12 @@ export class AgentManager extends EventEmitter {
     }
 
     await entry.session.setModel(model);
-    
     entry.info.model = modelId;
     entry.info.updatedAt = new Date();
-    
-    // 保存元数据
-    this.sessionMetadata.set(sessionId, entry.info);
-    this.saveMetadata();
   }
 
   /**
    * 设置会话使用的模型（支持完整配置）
-   * @param sessionId 会话ID
-   * @param modelConfig 模型配置，支持两种格式：
-   *   - 字符串: modelId (从 ModelRegistry 查找)
-   *   - 对象: { provider, baseUrl, apiKey, modelId } (直接构造 Model)
    */
   async setModelWithConfig(
     sessionId: string, 
@@ -698,27 +726,20 @@ export class AgentManager extends EventEmitter {
     let modelId: string;
     
     if (typeof modelConfig === 'string') {
-      // 字符串格式：从 ModelRegistry 查找
       modelId = modelConfig;
       model = this.findModel(modelConfig);
       if (!model) {
         throw new Error(`未找到模型: ${modelConfig}`);
       }
     } else {
-      // 对象格式：直接构造 Model
       modelId = modelConfig.modelId;
       model = this.createCustomModel(modelConfig);
       console.log(`已创建自定义模型: ${modelId}`);
     }
 
     await entry.session.setModel(model);
-    
     entry.info.model = modelId;
     entry.info.updatedAt = new Date();
-    
-    // 保存元数据
-    this.sessionMetadata.set(sessionId, entry.info);
-    this.saveMetadata();
   }
 
   /**
@@ -761,7 +782,6 @@ export class AgentManager extends EventEmitter {
           break;
 
         case 'message_end':
-          // 提取 usage 数据（如果存在）
           const message = event.message;
           const usage = message.role === 'assistant' && 'usage' in message ? message.usage : undefined;
           
@@ -865,22 +885,19 @@ export class AgentManager extends EventEmitter {
     models: Array<{ id: string; name?: string }>;
   }): void {
     try {
-      // 读取现有的 models.json
       let modelsJson: ModelsJsonConfig = { providers: {} };
       if (fs.existsSync(this.modelsJsonPath)) {
         const data = fs.readFileSync(this.modelsJsonPath, 'utf-8');
         modelsJson = JSON.parse(data);
       }
 
-      // 确保 providers 对象存在
       if (!modelsJson.providers) {
         modelsJson.providers = {};
       }
 
-      // 更新或添加 provider 配置
       modelsJson.providers[config.provider] = {
         baseUrl: config.baseUrl,
-        api: 'openai-completions', // 默认使用 OpenAI 兼容 API
+        api: 'openai-completions',
         apiKey: config.apiKey,
         models: config.models.map(m => ({
           id: m.id,
@@ -893,13 +910,11 @@ export class AgentManager extends EventEmitter {
         })),
       };
 
-      // 确保目录存在
       const dir = path.dirname(this.modelsJsonPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
 
-      // 写入文件
       fs.writeFileSync(this.modelsJsonPath, JSON.stringify(modelsJson, null, 2), 'utf-8');
       console.log(`已同步模型配置到 models.json: ${config.provider}`);
     } catch (error) {
@@ -944,17 +959,14 @@ export class AgentManager extends EventEmitter {
       let testUrl = '';
       let headers: Record<string, string> = {};
 
-      // 根据供应商构建测试请求
       switch (provider) {
         case 'anthropic':
-          // Anthropic 使用 messages API 测试
           testUrl = `${baseUrl}/v1/messages`;
           headers = {
             'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
             'content-type': 'application/json',
           };
-          // 发送一个最小请求来测试连接
           const anthropicResponse = await fetch(testUrl, {
             method: 'POST',
             headers,
@@ -964,19 +976,15 @@ export class AgentManager extends EventEmitter {
               messages: [{ role: 'user', content: 'hi' }],
             }),
           });
-          // 401 表示 API Key 无效
           if (anthropicResponse.status === 401) {
             return { success: false, error: 'API Key 无效' };
           }
-          // 200 表示成功
           if (anthropicResponse.status === 200) {
             return { success: true };
           }
-          // 其他状态码表示连接成功但请求有问题
           return { success: true, error: `服务器返回状态码 ${anthropicResponse.status}，但连接正常` };
 
         case 'openai':
-          // OpenAI 使用 models API 测试
           testUrl = `${baseUrl}/models`;
           headers = {
             'Authorization': `Bearer ${apiKey}`,
@@ -986,45 +994,34 @@ export class AgentManager extends EventEmitter {
             method: 'GET',
             headers,
           });
-          // 401 表示 API Key 无效
           if (openaiResponse.status === 401) {
             return { success: false, error: 'API Key 无效' };
           }
-          // 403 表示权限不足
           if (openaiResponse.status === 403) {
             return { success: false, error: 'API Key 权限不足' };
           }
-          // 200 表示成功
           if (openaiResponse.status === 200) {
             return { success: true };
           }
-          // 其他状态码表示连接成功但请求有问题
           return { success: true, error: `服务器返回状态码 ${openaiResponse.status}，但连接正常` };
 
         case 'google':
-          // Google Gemini 使用 models API 测试
           testUrl = `${baseUrl}/v1/models?key=${apiKey}`;
           const googleResponse = await fetch(testUrl, {
             method: 'GET',
           });
-          // 400 表示 API Key 无效
           if (googleResponse.status === 400) {
             return { success: false, error: 'API Key 无效' };
           }
-          // 403 表示权限不足
           if (googleResponse.status === 403) {
             return { success: false, error: 'API Key 权限不足或无效' };
           }
-          // 200 表示成功
           if (googleResponse.status === 200) {
             return { success: true };
           }
-          // 其他状态码表示连接成功但请求有问题
           return { success: true, error: `服务器返回状态码 ${googleResponse.status}，但连接正常` };
 
         case 'custom':
-          // 自定义供应商，尝试多种端点来测试 API key
-          // 首先尝试 /v1/models 端点（OpenAI 兼容）
           testUrl = `${baseUrl}/v1/models`;
           headers = {
             'Authorization': `Bearer ${apiKey}`,
@@ -1037,40 +1034,31 @@ export class AgentManager extends EventEmitter {
               headers,
             });
             
-            // 401 表示 API Key 无效
             if (modelsResponse.status === 401) {
               return { success: false, error: 'API Key 无效' };
             }
-            // 403 表示权限不足
             if (modelsResponse.status === 403) {
               return { success: false, error: 'API Key 权限不足' };
             }
-            // 200 表示成功
             if (modelsResponse.status === 200) {
               return { success: true };
             }
-            // 其他状态码表示连接成功但请求有问题
             return { success: true, error: `服务器返回状态码 ${modelsResponse.status}，但连接正常` };
           } catch (modelError) {
-            // 如果 /v1/models 失败，尝试根路径
             try {
               const rootResponse = await fetch(baseUrl, {
                 method: 'GET',
                 headers,
               });
               
-              // 401 表示 API Key 无效
               if (rootResponse.status === 401) {
                 return { success: false, error: 'API Key 无效' };
               }
-              // 403 表示权限不足
               if (rootResponse.status === 403) {
                 return { success: false, error: 'API Key 权限不足' };
               }
-              // 只要能连接上就认为成功
               return { success: true };
             } catch (rootError) {
-              // 如果都失败，返回网络错误
               throw rootError;
             }
           }
@@ -1079,7 +1067,6 @@ export class AgentManager extends EventEmitter {
           return { success: false, error: `不支持的供应商: ${provider}` };
       }
     } catch (error: any) {
-      // 网络错误
       if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
         return { success: false, error: '无法连接到服务器，请检查 Base URL' };
       }
@@ -1115,12 +1102,10 @@ export class AgentManager extends EventEmitter {
     const model = session.model;
     const totalTokens = model?.contextWindow || 128000;
 
-    // 从消息中提取 usage 数据
     let usedTokens = 0;
     let lastUsageId: string | undefined;
     const messages = session.messages;
 
-    // 从后向前查找最后一条有 usage 的 assistant 消息
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.role === 'assistant' && 'usage' in msg) {
@@ -1133,11 +1118,9 @@ export class AgentManager extends EventEmitter {
       }
     }
 
-    // 如果没有 usage 数据，使用启发式估算（字符数 / 4）
     if (usedTokens === 0) {
       let totalChars = 0;
       for (const msg of messages) {
-        // 处理不同类型的消息
         if ('content' in msg) {
           const content = msg.content;
           if (typeof content === 'string') {
@@ -1152,7 +1135,6 @@ export class AgentManager extends EventEmitter {
             }
           }
         }
-        // 处理 BashExecutionMessage
         if ('command' in msg && typeof msg.command === 'string') {
           totalChars += msg.command.length;
         }

@@ -102,3 +102,20 @@ export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   body: 'AI 已完成回复',
   triggerEvent: 'agent_end',
 };
+
+// 存储配置
+export interface StorageConfig {
+  /** 数据根目录 */
+  dataRoot: string;
+  /** sessions 子目录名 */
+  sessionsDir: string;
+}
+
+/** 默认存储配置 */
+export const DEFAULT_STORAGE_CONFIG: StorageConfig = {
+  dataRoot: '',  // 空字符串表示使用默认路径 ~/Pair/
+  sessionsDir: 'sessions',
+};
+
+/** localStorage key */
+export const STORAGE_CONFIG_KEY = 'pair-storage-config';

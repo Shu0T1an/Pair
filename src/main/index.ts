@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 import { AgentManager } from './agent-manager.js';
 import { IPCHandler } from './ipc-handler.js';
+import { StorageManager } from './storage-manager.js';
 
 // 禁用 GPU 加速（可选，解决某些显卡问题）
 // app.disableHardwareAcceleration();
@@ -12,8 +13,11 @@ const isDev = !app.isPackaged;
 app.setAppUserModelId('com.pair');
 
 let mainWindow: BrowserWindow | null = null;
-const agentManager = new AgentManager();
-const ipcHandler = new IPCHandler(agentManager);
+
+// 先创建 StorageManager，再注入 AgentManager
+const storageManager = new StorageManager();
+const agentManager = new AgentManager(storageManager);
+const ipcHandler = new IPCHandler(agentManager, storageManager);
 
 function createWindow() {
   mainWindow = new BrowserWindow({

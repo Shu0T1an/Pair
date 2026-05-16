@@ -165,6 +165,11 @@ function GeneralSettings() {
     body: 'AI 已完成回复',
     triggerEvent: 'agent_end',
   })
+  const [storageConfig, setStorageConfig] = useState<{ dataRoot: string; defaultDataRoot: string }>({
+    dataRoot: '',
+    defaultDataRoot: '',
+  })
+  const [isMigrating, setIsMigrating] = useState(false)
 
   // 加载通知配置
   const loadNotificationConfig = async () => {
@@ -173,6 +178,16 @@ function GeneralSettings() {
       setNotificationConfig(config)
     } catch (error) {
       console.error('加载通知配置失败:', error)
+    }
+  }
+
+  // 加载存储配置
+  const loadStorageConfig = async () => {
+    try {
+      const config = await ipcClient.getStorageConfig()
+      setStorageConfig(config)
+    } catch (error) {
+      console.error('加载存储配置失败:', error)
     }
   }
 
@@ -186,13 +201,81 @@ function GeneralSettings() {
     }
   }
 
+  // 选择存储路径
+  const handleSelectStoragePath = async () => {
+    const folder = await ipcClient.selectStorageFolder()
+    if (!folder) return
+    
+    if (window.confirm(`确定要将数据存储位置更改为：\n${folder}\n\n现有数据将被自动迁移。`)) {
+      setIsMigrating(true)
+      try {
+        const result = await ipcClient.setStorageDataRoot(folder)
+        if (result.success) {
+          setStorageConfig(prev => ({ ...prev, dataRoot: folder }))
+        } else {
+          alert(`更新失败: ${result.error}`)
+        }
+      } finally {
+        setIsMigrating(false)
+      }
+    }
+  }
+
+  // 重置为默认路径
+  const handleResetStoragePath = async () => {
+    if (window.confirm('确定要重置为默认存储路径吗？')) {
+      setIsMigrating(true)
+      try {
+        const result = await ipcClient.setStorageDataRoot('')
+        if (result.success) {
+          setStorageConfig(prev => ({ ...prev, dataRoot: '' }))
+        } else {
+          alert(`重置失败: ${result.error}`)
+        }
+      } finally {
+        setIsMigrating(false)
+      }
+    }
+  }
+
   // 组件挂载时加载配置
   useEffect(() => {
     loadNotificationConfig()
+    loadStorageConfig()
   }, [])
 
   return (
     <div className="space-y-6">
+      <SettingsGroup title="存储设置">
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-3 mb-2">
+            <Database size={16} className="text-muted-foreground" />
+            <div>
+              <div className="text-sm font-medium">数据存储位置</div>
+              <div className="text-xs text-muted-foreground">
+                当前路径: {storageConfig.dataRoot || storageConfig.defaultDataRoot}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleSelectStoragePath}
+              disabled={isMigrating}
+              className="text-xs text-primary border border-border px-3 py-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              {isMigrating ? '迁移中...' : '更改路径'}
+            </button>
+            <button
+              onClick={handleResetStoragePath}
+              disabled={isMigrating}
+              className="text-xs text-muted-foreground border border-border px-3 py-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              重置默认
+            </button>
+          </div>
+        </div>
+      </SettingsGroup>
+
       <SettingsGroup title="基本设置">
         <SettingsItem
           icon={Globe}

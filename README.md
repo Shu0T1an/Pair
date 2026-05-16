@@ -22,6 +22,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="preview.png" alt="Pair 主界面预览" width="100%" style="border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.15);" />
+</div>
+
 ## 📖 简介
 
 **Pair** 是一款基于 Electron 构建的通用 AI 助手桌面客户端，搭载 [`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) Agent 引擎，提供流畅的 AI 对话体验和代码协作能力。
