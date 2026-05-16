@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ChatArea } from '@/renderer/components/ChatArea'
 import { SessionList } from '@/renderer/components/SessionList'
 import { Header } from '@/renderer/components/Header'
@@ -19,7 +19,7 @@ export function ChatPage() {
   const [isStatsOpen, setIsStatsOpen] = useState(false)
   const [isSkillsOpen, setIsSkillsOpen] = useState(false)
   const { isDark, toggleDark } = useTheme()
-  const { addTab, closeTab, getTabSessions } = useTabState()
+  const { addTab, closeTab, closeAllTabs, getTabSessions } = useTabState()
   
   // 使用 Hooks
   const { 
@@ -53,6 +53,20 @@ export function ChatPage() {
     currentModelId: currentModelId,
     modelConfigs 
   })
+  
+  // 删除会话时同时关闭标签
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    // 先获取下一个要切换的标签 ID（在删除前调用，因为需要 currentActiveId）
+    const nextTabId = closeTab(sessionId, activeSessionId || undefined)
+    
+    // 删除会话
+    await deleteSession(sessionId)
+    
+    // 如果删除的是当前活跃会话，切换到下一个标签
+    if (sessionId === activeSessionId && nextTabId) {
+      selectSession(nextTabId)
+    }
+  }, [deleteSession, closeTab, activeSessionId, selectSession])
   
   // 当前会话信息
   const currentSession = projects
@@ -102,7 +116,7 @@ export function ChatPage() {
             onSelectSession={selectSession}
             onNewSession={handleNewSession}
             onNewSessionInProject={handleNewSessionInProject}
-            onDeleteSession={deleteSession}
+            onDeleteSession={handleDeleteSession}
             onDeleteAllSessionsInProject={deleteAllSessionsInProject}
             onRenameSession={renameSession}
             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -130,6 +144,9 @@ export function ChatPage() {
                 selectSession(nextId)
               }
             }}
+            onCloseAll={() => {
+              closeAllTabs()
+            }}
           />
           <ChatArea
             messages={messages}
@@ -140,6 +157,8 @@ export function ChatPage() {
             onSend={sendMessage}
             onAbort={abortMessage}
             onSelectModel={selectModel}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onNewSession={() => handleNewSession()}
           />
         </main>
       </div>

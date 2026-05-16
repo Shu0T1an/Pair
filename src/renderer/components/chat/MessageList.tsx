@@ -89,7 +89,7 @@ export function MessageList({ messages, modelName, isStreaming, onSendMessage, f
   }, [handleScroll])
   
   // 流式消息时自动滚动到底部
-  // 策略：流式中只要用户没滚远（>50%视口高度），就继续跟随；流式结束确认滚到底部
+  // 策略：只要用户向上滚动过（不在底部），就停止自动滚动；用户滚回底部后重新启用
   useEffect(() => {
     const container = viewportRef.current
     if (!container) return
@@ -98,19 +98,16 @@ export function MessageList({ messages, modelName, isStreaming, onSendMessage, f
     const isBottom = scrollHeight - scrollTop - clientHeight < 50
     
     if (isStreaming) {
-      // 流式期间：如果用户没明确向上滚动过（距离底部>50%视口高度），就自动滚动
-      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-      const userScrolledFarUp = userScrolledUpRef.current && distanceFromBottom > clientHeight * 0.5
-      
-      if (!userScrolledFarUp) {
+      // 流式期间：只有用户没有向上滚动过（仍在底部）时才自动滚动
+      if (!userScrolledUpRef.current && isBottom) {
         scrollToBottomImmediate()
       }
     } else if (!isStreaming) {
-      // 流式结束后：如果用户之前没主动向上滚远，确认滚到底部
+      // 流式结束后（agent_end）：如果用户之前没主动向上滚动，确认滚到底部
       if (!userScrolledUpRef.current && !isBottom) {
         scrollToBottomImmediate()
       }
-      // 重置用户滚动状态
+      // 重置用户滚动状态（只在 agent_end 时执行一次）
       userScrolledUpRef.current = false
     }
   }, [messages, isStreaming])

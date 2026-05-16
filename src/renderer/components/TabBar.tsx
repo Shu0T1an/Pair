@@ -8,9 +8,10 @@ interface TabBarProps {
   activeSessionId?: string
   onSelect: (sessionId: string) => void
   onClose: (sessionId: string) => void
+  onCloseAll: () => void
 }
 
-export function TabBar({ tabs, activeSessionId, onSelect, onClose }: TabBarProps) {
+export function TabBar({ tabs, activeSessionId, onSelect, onClose, onCloseAll }: TabBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -73,6 +74,7 @@ export function TabBar({ tabs, activeSessionId, onSelect, onClose }: TabBarProps
             isActive={session.id === activeSessionId}
             onSelect={() => onSelect(session.id)}
             onClose={() => onClose(session.id)}
+            onCloseAll={onCloseAll}
           />
         ))}
       </div>

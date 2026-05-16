@@ -12,6 +12,8 @@ interface ChatAreaProps {
   onSend: (text: string) => void
   onAbort: () => void
   onSelectModel: (modelId: string) => void
+  onOpenSettings?: () => void
+  onNewSession?: () => void
 }
 
 export function ChatArea({
@@ -23,6 +25,8 @@ export function ChatArea({
   onSend,
   onAbort,
   onSelectModel,
+  onOpenSettings,
+  onNewSession,
 }: ChatAreaProps) {
   const { fontSize } = useTheme()
   return (
@@ -45,6 +49,8 @@ export function ChatArea({
         onSend={onSend}
         onAbort={onAbort}
         onSelectModel={onSelectModel}
+        onOpenSettings={onOpenSettings}
+        onNewSession={onNewSession}
       />
     </div>
   )

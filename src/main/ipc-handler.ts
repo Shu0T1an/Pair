@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { AgentManager } from './agent-manager.js';
 import { StorageManager } from './storage-manager.js';
 import { NotificationManager } from './notification.js';
+import { searchProjectFiles, readFileContent } from './file-scanner.js';
 import type { SessionInfo, ProjectSessions, NotificationConfig } from '../shared/types.js';
 import { DEFAULT_NOTIFICATION_CONFIG } from '../shared/types.js';
 
@@ -129,6 +130,9 @@ export class IPCHandler {
     
     // Skills
     ipcMain.handle('skills:list', this.handleListSkills.bind(this));
+
+    ipcMain.handle('file:search', this.handleFileSearch.bind(this));
+    ipcMain.handle('file:readContent', this.handleFileReadContent.bind(this));
   }
 
   /**
@@ -550,6 +554,30 @@ export class IPCHandler {
   }
 
   /**
+   * 搜索工作区文件
+   */
+  private async handleFileSearch(_event: any, projectPath: string, query: string): Promise<any[]> {
+    try {
+      return searchProjectFiles(projectPath, query);
+    } catch (error) {
+      console.error('搜索文件失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 读取文件内容
+   */
+  private async handleFileReadContent(_event: any, filePath: string): Promise<string | null> {
+    try {
+      return readFileContent(filePath);
+    } catch (error) {
+      console.error('读取文件内容失败:', error);
+      return null;
+    }
+  }
+
+  /**
    * 清理资源
    */
   dispose() {
@@ -583,5 +611,7 @@ export class IPCHandler {
     ipcMain.removeHandler('storage:selectFolder');
     ipcMain.removeHandler('stats:getOverview');
     ipcMain.removeHandler('skills:list');
+    ipcMain.removeHandler('file:search');
+    ipcMain.removeHandler('file:readContent');
   }
 }

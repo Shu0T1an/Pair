@@ -5,6 +5,8 @@ import { cn } from '@/renderer/lib/utils'
 import type { ModelInfo } from '@/shared/types'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/renderer/components/ui/dropdown-menu'
 import { ipcClient } from '@/renderer/ipc-client'
+import { MentionPopup, type FileSearchItem } from './MentionPopup'
+import { CommandPopup, type SlashCommand } from './CommandPopup'
 
 interface ChatInputProps {
   currentModel: ModelInfo | null
@@ -14,6 +16,8 @@ interface ChatInputProps {
   onSend: (text: string) => void
   onAbort: () => void
   onSelectModel: (modelId: string) => void
+  onOpenSettings?: () => void
+  onNewSession?: () => void
 }
 
 // 格式化 token 数量
@@ -34,12 +38,38 @@ export function ChatInput({
   sessionId,
   onSend, 
   onAbort,
-  onSelectModel 
+  onSelectModel,
+  onOpenSettings,
+  onNewSession,
 }: ChatInputProps) {
   const [inputText, setInputText] = useState('')
   const [contextUsage, setContextUsage] = useState<{ usedTokens: number; totalTokens: number; percentage: number } | null>(null)
+  const [projectPath, setProjectPath] = useState<string>('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // 弹出层状态
+  const [mentionState, setMentionState] = useState<{
+    type: 'file' | 'command'
+    query: string
+  } | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [resultCount, setResultCount] = useState(0)
+  const [mentionResults, setMentionResults] = useState<FileSearchItem[]>([])
   
+  useEffect(() => {
+    if (!sessionId) return;
+    ipcClient.getSessionInfo(sessionId).then(info => {
+      if (info?.projectPath) {
+        setProjectPath(info.projectPath);
+      }
+    }).catch(() => {});
+    
+    // 切换会话时自动聚焦输入框
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, [sessionId]);
+
   // 获取上下文使用情况
   useEffect(() => {
     if (!sessionId) return;
@@ -55,7 +85,6 @@ export function ChatInput({
     
     fetchContextUsage();
     
-    // 每 30 秒更新一次
     const interval = setInterval(fetchContextUsage, 30000);
     
     return () => clearInterval(interval);
@@ -85,57 +114,168 @@ export function ChatInput({
     }, 1000);
   }, [inputText, isStreaming, onSend, sessionId])
   
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      if (isStreaming) {
-        // 流式响应中：中止当前对话
-        e.preventDefault()
-        onAbort()
-      } else if (inputText) {
-        // 非流式且有文本：清空输入框
-        e.preventDefault()
-        setInputText('')
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
+  const commands: SlashCommand[] = [
+    { name: 'settings', label: 'settings', description: '打开设置', handler: () => onOpenSettings?.() },
+    { name: 'new', label: 'new', description: '新建会话', handler: () => onNewSession?.() },
+    { name: 'clear', label: 'clear', description: '清空输入', handler: () => setInputText('') },
+  ]
+
+  const handleFileSelect = useCallback((item: FileSearchItem) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const cursorPos = textarea.selectionStart
+    const textBeforeCursor = textarea.value.slice(0, cursorPos)
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+    if (lastAtIndex < 0) return
+
+    const beforeAt = textarea.value.slice(0, lastAtIndex)
+    const afterCursor = textarea.value.slice(cursorPos)
+    const newText = `${beforeAt}@${item.relativePath} ${afterCursor}`
+
+    setInputText(newText)
+    setMentionState(null)
+    setSelectedIndex(0)
+
+    requestAnimationFrame(() => {
+      textarea.focus()
+      const newPos = lastAtIndex + item.relativePath.length + 2
+      textarea.setSelectionRange(newPos, newPos)
+    })
+  }, [])
+
+  const handleCommandSelect = useCallback((command: SlashCommand) => {
+    command.handler()
+    setMentionState(null)
+    setSelectedIndex(0)
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const cursorPos = textarea.selectionStart
+    const newText = textarea.value.slice(0, 1) === '/'
+      ? textarea.value.slice(cursorPos)
+      : textarea.value
+    setInputText(newText)
+    requestAnimationFrame(() => textarea.focus())
+  }, [])
+
+  const detectTrigger = useCallback((value: string, cursorPos: number) => {
+    const textBeforeCursor = value.slice(0, cursorPos)
+
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+    if (lastAtIndex >= 0) {
+      const charBefore = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' '
+      if (charBefore === ' ' || charBefore === '\n' || charBefore === '\t') {
+        const query = textBeforeCursor.slice(lastAtIndex + 1)
+        if (!query.includes(' ') && projectPath) {
+          return { type: 'file' as const, query }
         }
       }
-      return
     }
 
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+    if (textBeforeCursor === '/') {
+      return { type: 'command' as const, query: '' }
     }
-  }, [handleSend, isStreaming, inputText, onAbort])
-  
+
+    return null
+  }, [projectPath])
+
   const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputText(e.target.value)
+    const value = e.target.value
+    setInputText(value)
     
-    // 自动调整高度
     const textarea = e.target
     textarea.style.height = 'auto'
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
-  }, [])
-  
+
+    const cursorPos = textarea.selectionStart
+    const trigger = detectTrigger(value, cursorPos)
+    if (trigger) {
+      setMentionState(trigger)
+      setSelectedIndex(0)
+    } else {
+      setMentionState(null)
+    }
+  }, [detectTrigger])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionState) {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          if (resultCount > 0) {
+            setSelectedIndex(prev => (prev + 1) % resultCount)
+          }
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          if (resultCount > 0) {
+            setSelectedIndex(prev => (prev - 1 + resultCount) % resultCount)
+          }
+          break
+        case 'Enter': {
+          e.preventDefault()
+          if (mentionState.type === 'file') {
+            const item = mentionResults[selectedIndex]
+            if (item) handleFileSelect(item)
+          } else {
+            const cmd = commands[selectedIndex]
+            if (cmd) handleCommandSelect(cmd)
+          }
+          break
+        }
+        case 'Escape':
+          e.preventDefault()
+          setMentionState(null)
+          setSelectedIndex(0)
+          break
+      }
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }, [mentionState, selectedIndex, resultCount, mentionResults, commands, handleFileSelect, handleCommandSelect, handleSend])
+
   return (
     <div className="border-t bg-background p-4">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-end gap-2 bg-muted rounded-xl p-2">
-          {/* 附件按钮 */}
+        <div className="flex items-end gap-2 bg-muted rounded-xl p-2 relative">
           <Button variant="ghost" size="icon" className="shrink-0">
             <Paperclip size={18} />
           </Button>
           
-          {/* 输入框 */}
-          <textarea
-            ref={textareaRef}
-            value={inputText}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            placeholder="输入消息..."
-            className="flex-1 bg-transparent resize-none outline-none min-h-[24px] max-h-[200px] py-1"
-            rows={1}
-          />
+          <div className="flex-1 relative">
+            {mentionState?.type === 'file' && (
+              <MentionPopup
+                query={mentionState.query}
+                projectPath={projectPath}
+                selectedIndex={selectedIndex}
+                onSelect={handleFileSelect}
+                onResultsChange={(results) => {
+                  setMentionResults(results)
+                  setResultCount(results.length)
+                  if (selectedIndex >= results.length) setSelectedIndex(0)
+                }}
+              />
+            )}
+
+            {mentionState?.type === 'command' && (
+              <CommandPopup
+                commands={commands}
+                selectedIndex={selectedIndex}
+                onSelect={handleCommandSelect}
+              />
+            )}
+            
+            <textarea
+              ref={textareaRef}
+              value={inputText}
+              onChange={handleInput}
+              onKeyDown={handleKeyDown}
+              placeholder="输入消息... (@ 引用文件, / 执行命令)"
+              className="flex-1 w-full bg-transparent resize-none outline-none min-h-[24px] max-h-[200px] py-1"
+              rows={1}
+            />
+          </div>
           
           {/* 发送/停止按钮 */}
           {isStreaming ? (

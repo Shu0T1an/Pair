@@ -92,6 +92,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: () => ipcRenderer.invoke('skills:list'),
   },
 
+  // 文件搜索
+  file: {
+    search: (projectPath: string, query: string) => 
+      ipcRenderer.invoke('file:search', projectPath, query),
+    readContent: (filePath: string) => 
+      ipcRenderer.invoke('file:readContent', filePath),
+  },
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = [

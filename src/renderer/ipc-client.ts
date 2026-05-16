@@ -152,12 +152,23 @@ interface ElectronAPI {
     getOverview: () => Promise<OverviewStats>;
   };
 
+  // Skills
+  skills: {
+    list: () => Promise<any[]>;
+  };
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => () => void;
 
   // 上下文使用情况
   context: {
     usage: (sessionId: string) => Promise<{ usedTokens: number; totalTokens: number; percentage: number }>;
+  };
+
+  // 文件搜索
+  file: {
+    search: (projectPath: string, query: string) => Promise<any[]>;
+    readContent: (filePath: string) => Promise<string | null>;
   };
 }
 
@@ -578,6 +589,28 @@ export class IPCClient {
   removeAllListeners(): void {
     this.listeners.forEach((unsubscribe) => unsubscribe());
     this.listeners.clear();
+  }
+
+  // ── 文件搜索 ──
+
+  /**
+   * 搜索工作区文件
+   */
+  async searchFiles(projectPath: string, query: string): Promise<any[]> {
+    if (!this.isElectron()) {
+      return [];
+    }
+    return window.electronAPI.file.search(projectPath, query);
+  }
+
+  /**
+   * 读取文件内容
+   */
+  async readFileContent(filePath: string): Promise<string | null> {
+    if (!this.isElectron()) {
+      return null;
+    }
+    return window.electronAPI.file.readContent(filePath);
   }
 
   /**

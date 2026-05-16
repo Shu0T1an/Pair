@@ -103,10 +103,18 @@ export function useTabState() {
     return openTabIds.includes(sessionId)
   }, [openTabIds])
 
+  /**
+   * 关闭全部标签
+   */
+  const closeAllTabs = useCallback(() => {
+    setOpenTabIds([])
+  }, [])
+
   return {
     openTabIds,
     addTab,
     closeTab,
+    closeAllTabs,
     getTabSessions,
     hasTab,
   }

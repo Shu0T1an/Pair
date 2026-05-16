@@ -477,25 +477,39 @@ export class AgentManager extends EventEmitter {
   async deleteSession(sessionId: string): Promise<void> {
     const entry = this.sessions.get(sessionId);
     
-    if (!entry) {
-      throw new Error(`会话 ${sessionId} 不存在`);
-    }
-    
-    // 从内存中移除
-    this.sessions.delete(sessionId);
-    this.currentMessageIds.delete(sessionId);
-    
-    // 删除 session 文件
-    const sessionFile = entry.session.sessionManager.getSessionFile();
-    if (sessionFile && fs.existsSync(sessionFile)) {
-      try {
+    if (entry) {
+      // 会话在内存中，正常删除
+      this.sessions.delete(sessionId);
+      this.currentMessageIds.delete(sessionId);
+      
+      // 删除 session 文件
+      const sessionFile = entry.session.sessionManager.getSessionFile();
+      if (sessionFile && fs.existsSync(sessionFile)) {
+        try {
+          entry.session.dispose();
+          fs.unlinkSync(sessionFile);
+        } catch (error) {
+          console.error('删除会话文件失败:', error);
+        }
+      } else {
         entry.session.dispose();
-        fs.unlinkSync(sessionFile);
-      } catch (error) {
-        console.error('删除会话文件失败:', error);
       }
     } else {
-      entry.session.dispose();
+      // 会话不在内存中，尝试从磁盘查找并删除
+      const sessionsDir = this.storageManager.getSessionsDir();
+      const sessionFile = await findSessionFile(sessionsDir, sessionId);
+      
+      if (!sessionFile) {
+        throw new Error(`会话 ${sessionId} 不存在`);
+      }
+      
+      try {
+        fs.unlinkSync(sessionFile);
+        console.log(`已删除磁盘上的会话文件: ${sessionFile}`);
+      } catch (error) {
+        console.error('删除会话文件失败:', error);
+        throw new Error(`删除会话文件失败: ${error}`);
+      }
     }
   }
 

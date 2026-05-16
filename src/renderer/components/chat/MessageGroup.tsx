@@ -91,7 +91,7 @@ export const MessageGroup = memo(function MessageGroup({ role, messages, modelNa
       </div>
       
       {/* 消息内容 */}
-      <div className="max-w-[80%] min-w-0">
+      <div className="min-w-0 mr-9">
         {/* 角色标注 */}
         <div className="text-[11px] font-medium mb-1.5 px-1 text-muted-foreground">
           {modelName || 'AI 助手'}

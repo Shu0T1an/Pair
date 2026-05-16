@@ -163,16 +163,15 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
         return prev
       })
       
-      setIsStreaming(false)
-      // 注意：不在 message_end 清除全局流式状态，
+      // 注意：不在 message_end 设置 isStreaming = false，
       // 因为 tool_execution_start/end 事件在 message_end 之后才到达。
-      // 需要保留 streaming.message 以便后续工具调用能被正确附加到消息中。
-      // 清除工作交由 agent_end 处理。
+      // isStreaming 的重置交由 agent_end 处理。
     })
 
     // agent_end — 整个 agent 处理完成，清理流式状态，更新状态为 completed
     const unsubAgentEnd = ipcClient.onAgentEnd((event: AgentEndEvent) => {
       if (event.sessionId !== sessionId) return
+      setIsStreaming(false)
       clearStreamState(sessionId)
       setSessionStatus(sessionId, 'completed')
     })
@@ -188,6 +187,11 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
     if (!sessionId) return
 
     let cancelled = false
+    // 缓存上一次的消息内容，避免不必要的更新
+    let lastContent = ''
+    let lastThinking = ''
+    let lastToolCallsLength = 0
+    let lastToolCallsStatus = ''
 
     const unsubscribe = subscribe(sessionId, () => {
       if (cancelled) return
@@ -195,7 +199,23 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
       const streamingMessage = getStreamingMessage(sessionId)
       if (!streamingMessage) return
       
-      console.log('[useMessages] subscribe callback - toolCalls:', streamingMessage.toolCalls?.length || 0, 'isStreaming:', streamingMessage.isStreaming)
+      // 检查内容是否有变化，避免不必要的更新
+      const currentContent = streamingMessage.content || ''
+      const currentThinking = streamingMessage.thinking || ''
+      const currentToolCallsLength = streamingMessage.toolCalls?.length || 0
+      const currentToolCallsStatus = streamingMessage.toolCalls?.map(tc => tc.status).join(',') || ''
+      
+      const hasChanged = currentContent !== lastContent || 
+                         currentThinking !== lastThinking || 
+                         currentToolCallsLength !== lastToolCallsLength ||
+                         currentToolCallsStatus !== lastToolCallsStatus
+      
+      if (!hasChanged) return
+      
+      lastContent = currentContent
+      lastThinking = currentThinking
+      lastToolCallsLength = currentToolCallsLength
+      lastToolCallsStatus = currentToolCallsStatus
 
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1]
