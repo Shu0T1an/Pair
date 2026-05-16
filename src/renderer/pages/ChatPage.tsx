@@ -6,6 +6,7 @@ import { TitleBar } from '@/renderer/components/TitleBar'
 import { TabBar } from '@/renderer/components/TabBar'
 import { SettingsModal } from '@/renderer/components/SettingsModal'
 import { StatsModal } from '@/renderer/components/StatsModal'
+import { SkillsModal } from '@/renderer/components/SkillsModal'
 import { useSessions } from '@/renderer/hooks/useSessions'
 import { useMessages } from '@/renderer/hooks/useMessages'
 import { useModels } from '@/renderer/hooks/useModels'
@@ -16,6 +17,7 @@ import { useModelContext } from '@/renderer/contexts/ModelContext'
 export function ChatPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isStatsOpen, setIsStatsOpen] = useState(false)
+  const [isSkillsOpen, setIsSkillsOpen] = useState(false)
   const { isDark, toggleDark } = useTheme()
   const { addTab, closeTab, getTabSessions } = useTabState()
   
@@ -115,6 +117,7 @@ export function ChatPage() {
             onToggleTheme={toggleDark}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenStats={() => setIsStatsOpen(true)}
+            onOpenSkills={() => setIsSkillsOpen(true)}
           />
           <TabBar
             tabs={tabSessions}
@@ -151,6 +154,12 @@ export function ChatPage() {
       <StatsModal
         isOpen={isStatsOpen}
         onClose={() => setIsStatsOpen(false)}
+      />
+      
+      {/* Skills 面板 */}
+      <SkillsModal
+        isOpen={isSkillsOpen}
+        onClose={() => setIsSkillsOpen(false)}
       />
     </div>
   )
