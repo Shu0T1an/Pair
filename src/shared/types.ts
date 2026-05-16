@@ -119,3 +119,60 @@ export const DEFAULT_STORAGE_CONFIG: StorageConfig = {
 
 /** localStorage key */
 export const STORAGE_CONFIG_KEY = 'pair-storage-config';
+
+// 统计记录
+export interface StatsRecord {
+  timestamp: string
+  sessionId: string
+  model: string
+  provider: string
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  totalTokens: number
+}
+
+// 每日统计
+export interface DailyStats {
+  date: string
+  totalTokens: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+// 模型统计
+export interface ModelStats {
+  model: string
+  provider: string
+  totalTokens: number
+  percentage: number
+}
+
+// 统计概览
+export interface OverviewStats {
+  totalTokens: number
+  totalDays: number
+  totalSessions: number
+  dailyStats: DailyStats[]
+  modelStats: ModelStats[]
+  trendData: {
+    daily: DailyStats[]
+    weekly: DailyStats[]
+    monthly: DailyStats[]
+  }
+}
+
+// ElectronAPI 类型声明
+declare global {
+  interface Window {
+    electronAPI: {
+      // ... 其他 API
+      stats: {
+        getOverview: () => Promise<OverviewStats>
+      }
+    }
+  }
+}
