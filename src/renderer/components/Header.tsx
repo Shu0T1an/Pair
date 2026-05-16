@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Settings,
   Moon,
   Sun,
@@ -13,6 +14,7 @@ interface HeaderProps {
   isDark?: boolean
   onToggleTheme: () => void
   onOpenSettings: () => void
+  onOpenStats: () => void
 }
 
 export function Header({
@@ -20,6 +22,7 @@ export function Header({
   isDark = true,
   onToggleTheme,
   onOpenSettings,
+  onOpenStats,
 }: HeaderProps) {
   return (
     <TooltipProvider>
@@ -54,6 +57,15 @@ export function Header({
               <TooltipContent>
                 {isDark ? '切换到浅色模式' : '切换到深色模式'}
               </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" onClick={onOpenStats}>
+                  <BarChart3 size={14} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>统计</TooltipContent>
             </Tooltip>
 
             <Tooltip>

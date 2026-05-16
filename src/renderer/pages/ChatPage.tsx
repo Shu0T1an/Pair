@@ -5,6 +5,7 @@ import { Header } from '@/renderer/components/Header'
 import { TitleBar } from '@/renderer/components/TitleBar'
 import { TabBar } from '@/renderer/components/TabBar'
 import { SettingsModal } from '@/renderer/components/SettingsModal'
+import { StatsModal } from '@/renderer/components/StatsModal'
 import { useSessions } from '@/renderer/hooks/useSessions'
 import { useMessages } from '@/renderer/hooks/useMessages'
 import { useModels } from '@/renderer/hooks/useModels'
@@ -14,6 +15,7 @@ import { useModelContext } from '@/renderer/contexts/ModelContext'
 
 export function ChatPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isStatsOpen, setIsStatsOpen] = useState(false)
   const { isDark, toggleDark } = useTheme()
   const { addTab, closeTab, getTabSessions } = useTabState()
   
@@ -112,6 +114,7 @@ export function ChatPage() {
             isDark={isDark}
             onToggleTheme={toggleDark}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenStats={() => setIsStatsOpen(true)}
           />
           <TabBar
             tabs={tabSessions}
@@ -142,6 +145,12 @@ export function ChatPage() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+      
+      {/* 统计面板 */}
+      <StatsModal
+        isOpen={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
       />
     </div>
   )
