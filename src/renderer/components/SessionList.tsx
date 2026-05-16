@@ -10,11 +10,14 @@ import {
   Edit3,
   Settings,
 } from 'lucide-react'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/renderer/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/renderer/components/ui/dropdown-menu'
 import { Button } from '@/renderer/components/ui/button'
 import { ScrollArea } from '@/renderer/components/ui/scroll-area'
 import { Badge } from '@/renderer/components/ui/badge'
-import type { ProjectSessions, SessionInfo } from '@/shared/types'
+import { SessionStatusIndicator } from '@/renderer/components/SessionStatusIndicator'
+import { StreamingIndicator } from '@/renderer/components/StreamingIndicator'
+import { useSessionState } from '@/renderer/contexts/SessionStateContext'
+import type { ProjectSessions, SessionInfo, SessionStatus } from '@/shared/types'
 import { cn } from '@/renderer/lib/utils'
 
 interface SessionListProps {
@@ -44,6 +47,7 @@ export function SessionList({
     new Set(projects.map((p) => p.projectPath))
   )
   const [searchQuery, _setSearchQuery] = useState('')
+  const { getStatus } = useSessionState()
 
   const toggleProject = (projectPath: string) => {
     setExpandedProjects((prev) => {
@@ -90,7 +94,7 @@ export function SessionList({
   }
 
   return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground p-3">
+    <div className="flex flex-col h-full bg-card rounded-2xl shadow-sm border border-border p-3 overflow-hidden">
       {/* 头部 - 新会话按钮 */}
       <div className="mb-4">
         <Button 
@@ -171,6 +175,7 @@ export function SessionList({
                       key={session.id}
                       session={session}
                       isActive={session.id === activeSessionId}
+                      status={getStatus(session.id)}
                       onSelect={() => onSelectSession(session.id)}
                       onDelete={() => onDeleteSession(session.id)}
                       onRename={(newName) => onRenameSession(session.id, newName)}
@@ -207,12 +212,13 @@ export function SessionList({
 interface SessionItemProps {
   session: SessionInfo
   isActive: boolean
+  status: SessionStatus
   onSelect: () => void
   onDelete: () => void
   onRename: (newName: string) => void
 }
 
-function SessionItem({ session, isActive, onSelect, onDelete, onRename }: SessionItemProps) {
+function SessionItem({ session, isActive, status, onSelect, onDelete, onRename }: SessionItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(session.name)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -251,13 +257,16 @@ function SessionItem({ session, isActive, onSelect, onDelete, onRename }: Sessio
   return (
     <div
       className={cn(
-        'grid grid-cols-[1fr_auto] gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all',
+        'grid grid-cols-[auto_1fr_auto] gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all',
         isActive
           ? 'bg-white/80 shadow-sm border border-border'
           : 'hover:bg-white/50'
       )}
       onClick={onSelect}
     >
+      {/* 状态指示器 */}
+      <SessionStatusIndicator status={status} className="mt-0.5" />
+
       <div className="min-w-0">
         {isEditing ? (
           <input
@@ -273,7 +282,10 @@ function SessionItem({ session, isActive, onSelect, onDelete, onRename }: Sessio
         ) : (
           <div className={cn('text-sm font-medium truncate', isActive ? 'text-foreground' : 'text-foreground/80')}>
             {session.name}
-            <span className="text-[9px] bg-muted px-1 rounded text-muted-foreground ml-2">默认</span>
+            <StreamingIndicator sessionId={session.id} className="ml-2" />
+            {status === 'idle' && (
+              <span className="text-[9px] bg-muted px-1 rounded text-muted-foreground ml-2">默认</span>
+            )}
           </div>
         )}
       </div>

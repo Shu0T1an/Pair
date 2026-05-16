@@ -2,32 +2,12 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Message } from '@/shared/types'
 import { ipcClient } from '@/renderer/ipc-client'
 import type { ModelConfig } from '@/renderer/contexts/ModelContext'
+import { useSessionState } from '@/renderer/contexts/SessionStateContext'
+import { useGlobalStream } from '@/renderer/contexts/GlobalStreamContext'
 import type { 
-  TextDeltaEvent, 
-  ThinkingDeltaEvent, 
-  MessageStartEvent, 
   MessageEndEvent,
-  ToolStartEvent,
-  ToolEndEvent 
+  AgentEndEvent 
 } from '@/renderer/ipc-client'
-
-// 将工具结果转换为字符串
-function toolResultToString(result: unknown): string {
-  if (typeof result === 'string') {
-    return result
-  }
-  if (typeof result === 'object' && result !== null) {
-    const obj = result as Record<string, unknown>
-    if ('text' in obj && typeof obj.text === 'string') {
-      return obj.text
-    }
-    if ('content' in obj && typeof obj.content === 'string') {
-      return obj.content
-    }
-    return JSON.stringify(result, null, 2)
-  }
-  return String(result)
-}
 
 interface UseMessagesOptions {
   sessionId: string | null
@@ -40,59 +20,11 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  const { updateStatus } = useSessionState()
+  const { getStreamingMessage, isSessionStreaming, clearStreamState, subscribe } = useGlobalStream()
   
-  // 流式消息引用
-  const streamingMessageRef = useRef<{ id: string } | null>(null)
-  
-  // 流式内容缓冲区
-  const streamBufferRef = useRef<string>('')
-  const streamThinkingBufferRef = useRef<string>('')
-  const rafIdRef = useRef<number | null>(null)
-  const lastUpdateRef = useRef<number>(0)
-
-  // 刷新流缓冲区 - 使用 ref 来避免依赖问题
-  const flushStreamBufferRef = useRef<() => void>(() => {})
-  
-  // 在 effect 中更新 ref，避免在渲染期间更新
-  useEffect(() => {
-    flushStreamBufferRef.current = () => {
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current)
-      rafIdRef.current = null
-    }
-    
-    const now = Date.now()
-    const timeSinceLastUpdate = now - lastUpdateRef.current
-    
-    if (timeSinceLastUpdate < 16) {
-      rafIdRef.current = requestAnimationFrame(() => {
-        flushStreamBufferRef.current()
-      })
-      return
-    }
-    
-    lastUpdateRef.current = now
-    const bufferedContent = streamBufferRef.current
-    const bufferedThinking = streamThinkingBufferRef.current
-    
-    streamBufferRef.current = ''
-    streamThinkingBufferRef.current = ''
-    
-    if (bufferedContent || bufferedThinking) {
-      setMessages(prev => {
-        const lastMessage = prev[prev.length - 1]
-        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-          return [...prev.slice(0, -1), {
-            ...lastMessage,
-            content: lastMessage.content + bufferedContent,
-            thinking: bufferedThinking ? (lastMessage.thinking || '') + bufferedThinking : lastMessage.thinking,
-          }]
-        }
-        return prev
-      })
-    }
-  }
-  }, []) // 空依赖数组，只在挂载时设置一次
+  // 标记当前 effect 是否已清理
+  const isCancelledRef = useRef(false)
 
   // 加载会话消息
   const loadMessages = useCallback(async (sid: string) => {
@@ -131,6 +63,7 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
     
     setMessages(prev => [...prev, userMessage])
     setIsStreaming(true)
+    updateStatus(sessionId, 'working')
     
     try {
       // 如果当前模型有对应的项目配置，传完整配置对象（走 createCustomModel 路径）
@@ -159,7 +92,7 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
       console.error('发送消息失败:', error)
       setIsStreaming(false)
     }
-  }, [sessionId, currentModelId, modelConfigs])
+  }, [sessionId, currentModelId, modelConfigs, updateStatus])
 
   // 中止消息
   const abortMessage = useCallback(async () => {
@@ -168,144 +101,122 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
     try {
       await ipcClient.abortMessage(sessionId)
       setIsStreaming(false)
+      updateStatus(sessionId, 'idle')
     } catch (error) {
       console.error('中止消息失败:', error)
     }
-  }, [sessionId])
+  }, [sessionId, updateStatus])
 
   // 切换会话时加载消息
   useEffect(() => {
+    isCancelledRef.current = false
+    
     if (sessionId) {
       loadMessages(sessionId)
+      
+      // 检查是否有正在进行的流式消息
+      const streamingMessage = getStreamingMessage(sessionId)
+      if (streamingMessage && !isCancelledRef.current) {
+        setMessages(prev => {
+          // 检查消息是否已存在
+          const exists = prev.some(m => m.id === streamingMessage.id)
+          if (exists) {
+            // 更新已存在的消息
+            return prev.map(m => m.id === streamingMessage.id ? streamingMessage : m)
+          }
+          // 添加新的流式消息
+          return [...prev, streamingMessage]
+        })
+        setIsStreaming(isSessionStreaming(sessionId))
+      }
     } else {
       setMessages([])
     }
-  }, [sessionId, loadMessages])
+    
+    return () => {
+      isCancelledRef.current = true
+    }
+  }, [sessionId, loadMessages, getStreamingMessage, isSessionStreaming])
 
-  // 注册流式事件监听
+  // 注册消息完成事件监听
   useEffect(() => {
     if (!sessionId) return
 
-    // message_start
-    const unsubMessageStart = ipcClient.onMessageStart((event: MessageStartEvent) => {
-      if (event.sessionId !== sessionId) return
-      
-      streamingMessageRef.current = { id: event.messageId }
-      
-      const assistantMessage: Message = {
-        id: event.messageId,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        isStreaming: true,
-        streamingStartTime: new Date(),
-      }
-      
-      setMessages(prev => [...prev, assistantMessage])
-    })
-
-    // text_delta
-    const unsubTextDelta = ipcClient.onTextDelta((event: TextDeltaEvent) => {
-      if (event.sessionId !== sessionId) return
-      
-      streamBufferRef.current += event.delta
-      flushStreamBufferRef.current()
-    })
-
-    // thinking_delta
-    const unsubThinkingDelta = ipcClient.onThinkingDelta((event: ThinkingDeltaEvent) => {
-      if (event.sessionId !== sessionId) return
-      
-      streamThinkingBufferRef.current += event.delta
-      flushStreamBufferRef.current()
-    })
-
-    // message_end
+    // message_end - 处理消息完成
     const unsubMessageEnd = ipcClient.onMessageEnd((event: MessageEndEvent) => {
       if (event.sessionId !== sessionId) return
       
-      flushStreamBufferRef.current()
+      // 从全局状态获取完整消息
+      const streamingMessage = getStreamingMessage(sessionId)
       
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1]
         if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
           return [...prev.slice(0, -1), {
             ...lastMessage,
+            content: streamingMessage?.content || lastMessage.content,
+            thinking: streamingMessage?.thinking || lastMessage.thinking,
             isStreaming: false,
             streamingEndTime: new Date(),
             usage: event.usage,
+            toolCalls: streamingMessage?.toolCalls || lastMessage.toolCalls,
           }]
         }
         return prev
       })
       
-      streamingMessageRef.current = null
       setIsStreaming(false)
+      clearStreamState(sessionId)  // 清除全局流式状态
     })
 
-    // tool_start
-    const unsubToolStart = ipcClient.onToolStart((event: ToolStartEvent) => {
+    // agent_end — 整个 agent 处理完成，更新状态为 completed
+    const unsubAgentEnd = ipcClient.onAgentEnd((event: AgentEndEvent) => {
       if (event.sessionId !== sessionId) return
-      
-      setMessages(prev => {
-        const lastMessage = prev[prev.length - 1]
-        if (lastMessage && lastMessage.role === 'assistant') {
-          const toolCall = {
-            id: event.toolCallId,
-            name: event.toolName,
-            args: event.args,
-            status: 'running' as const,
-            startTime: new Date(),
-          }
-          
-          return [...prev.slice(0, -1), {
-            ...lastMessage,
-            toolCalls: [...(lastMessage.toolCalls || []), toolCall],
-          }]
-        }
-        return prev
-      })
-    })
-
-    // tool_end
-    const unsubToolEnd = ipcClient.onToolEnd((event: ToolEndEvent) => {
-      if (event.sessionId !== sessionId) return
-      
-      setMessages(prev => {
-        const lastMessage = prev[prev.length - 1]
-        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.toolCalls) {
-          const resultStr = toolResultToString(event.result)
-          const updatedToolCalls = lastMessage.toolCalls.map(tc => {
-            if (tc.id === event.toolCallId) {
-              return {
-                ...tc,
-                status: event.isError ? 'error' as const : 'success' as const,
-                result: resultStr,
-                error: event.isError ? resultStr : undefined,
-                endTime: new Date(),
-              }
-            }
-            return tc
-          })
-          
-          return [...prev.slice(0, -1), {
-            ...lastMessage,
-            toolCalls: updatedToolCalls,
-          }]
-        }
-        return prev
-      })
+      updateStatus(sessionId, 'completed')
     })
 
     return () => {
-      unsubMessageStart()
-      unsubTextDelta()
-      unsubThinkingDelta()
       unsubMessageEnd()
-      unsubToolStart()
-      unsubToolEnd()
+      unsubAgentEnd()
     }
-  }, [sessionId])
+  }, [sessionId, getStreamingMessage, clearStreamState, updateStatus])
+
+  // 订阅全局流式状态变化，实时更新消息
+  useEffect(() => {
+    if (!sessionId) return
+
+    let cancelled = false
+
+    const unsubscribe = subscribe(sessionId, () => {
+      if (cancelled) return
+      
+      const streamingMessage = getStreamingMessage(sessionId)
+      if (!streamingMessage) return
+
+      setMessages(prev => {
+        const lastMessage = prev[prev.length - 1]
+        
+        // 如果最后一条消息是正在流式的助手消息，更新它
+        if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+          return [...prev.slice(0, -1), streamingMessage]
+        }
+        
+        // 如果最后一条不是流式消息，但有新的流式消息，添加它
+        if (streamingMessage.isStreaming && !prev.some(m => m.id === streamingMessage.id)) {
+          return [...prev, streamingMessage]
+        }
+        
+        return prev
+      })
+      
+      setIsStreaming(isSessionStreaming(sessionId))
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [sessionId, getStreamingMessage, isSessionStreaming, subscribe])
 
   // 缓存消息
   useEffect(() => {

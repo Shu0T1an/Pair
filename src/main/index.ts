@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, session } from 'electron';
 import path from 'path';
 import { AgentManager } from './agent-manager.js';
 import { IPCHandler } from './ipc-handler.js';

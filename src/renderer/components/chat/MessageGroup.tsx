@@ -33,7 +33,7 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({
   )
 })
 
-export function MessageGroup({ role, messages, modelName, showTimestamp }: MessageGroupProps) {
+export const MessageGroup = memo(function MessageGroup({ role, messages, modelName, showTimestamp }: MessageGroupProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const { settings } = useMessageSettings()
   
@@ -164,4 +164,12 @@ export function MessageGroup({ role, messages, modelName, showTimestamp }: Messa
       </div>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  // 自定义比较函数，避免不必要的重渲染
+  return (
+    prevProps.role === nextProps.role &&
+    prevProps.messages === nextProps.messages &&
+    prevProps.modelName === nextProps.modelName &&
+    prevProps.showTimestamp === nextProps.showTimestamp
+  )
+})

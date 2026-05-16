@@ -68,6 +68,9 @@ export interface ModelInfo {
   contextWindow?: number;  // 上下文窗口大小
 }
 
+// 会话状态
+export type SessionStatus = 'idle' | 'working' | 'completed' | 'error'
+
 // 应用设置
 export interface AppSettings {
   theme: 'dark' | 'light';

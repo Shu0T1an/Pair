@@ -75,6 +75,18 @@ export interface AgentEndEvent {
   timestamp: Date;
 }
 
+export interface TurnStartEvent {
+  sessionId: string;
+  timestamp: Date;
+}
+
+export interface TurnEndEvent {
+  sessionId: string;
+  message: any;
+  toolResults: any[];
+  timestamp: Date;
+}
+
 // 定义 Electron API 类型
 interface ElectronAPI {
   // 窗口控制
@@ -479,6 +491,14 @@ export class IPCClient {
 
   onAgentEnd(callback: (event: AgentEndEvent) => void): () => void {
     return this.on('agent:agent_end', callback);
+  }
+
+  onTurnStart(callback: (event: TurnStartEvent) => void): () => void {
+    return this.on('agent:turn_start', callback);
+  }
+
+  onTurnEnd(callback: (event: TurnEndEvent) => void): () => void {
+    return this.on('agent:turn_end', callback);
   }
 
   /**
