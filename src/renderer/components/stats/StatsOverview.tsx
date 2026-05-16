@@ -2,12 +2,12 @@ import { Zap, Calendar, MessageSquare, TrendingUp } from 'lucide-react'
 
 interface StatsOverviewProps {
   totalTokens: number
-  totalDays: number
+  todayTokens: number
   totalSessions: number
 }
 
-export function StatsOverview({ totalTokens, totalDays, totalSessions }: StatsOverviewProps) {
-  const dailyAvg = totalDays > 0 ? Math.round(totalTokens / totalDays) : 0
+export function StatsOverview({ totalTokens, todayTokens, totalSessions }: StatsOverviewProps) {
+  const dailyAvg = totalSessions > 0 ? Math.round(totalTokens / totalSessions) : 0
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
@@ -17,7 +17,7 @@ export function StatsOverview({ totalTokens, totalDays, totalSessions }: StatsOv
 
   const cards = [
     { icon: Zap, label: '总 Token', value: formatNumber(totalTokens), color: 'text-yellow-500' },
-    { icon: Calendar, label: '活跃天数', value: `${totalDays} 天`, color: 'text-blue-500' },
+    { icon: Calendar, label: '今日消耗', value: formatNumber(todayTokens), color: 'text-blue-500' },
     { icon: MessageSquare, label: '会话数', value: `${totalSessions} 个`, color: 'text-green-500' },
     { icon: TrendingUp, label: '日均消耗', value: formatNumber(dailyAvg), color: 'text-purple-500' },
   ]

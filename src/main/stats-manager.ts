@@ -31,7 +31,7 @@ export interface ModelStats {
 
 export interface OverviewStats {
   totalTokens: number
-  totalDays: number
+  todayTokens: number
   totalSessions: number
   dailyStats: DailyStats[]
   modelStats: ModelStats[]
@@ -112,6 +112,11 @@ export class StatsManager {
       model.percentage = totalTokens > 0 ? Math.round((model.totalTokens / totalTokens) * 100) : 0
     }
     
+    // 计算今日消耗
+    const today = new Date().toISOString().split('T')[0]
+    const todayStats = dailyMap.get(today)
+    const todayTokens = todayStats ? todayStats.totalTokens : 0
+    
     // 生成 365 天数据（热力图用）
     const dailyStats = this.generateLast365Days(dailyMap)
     
@@ -124,7 +129,7 @@ export class StatsManager {
     
     return {
       totalTokens,
-      totalDays: dailyMap.size,
+      todayTokens,
       totalSessions: sessionSet.size,
       dailyStats,
       modelStats: Array.from(modelMap.values()).sort((a, b) => b.totalTokens - a.totalTokens),

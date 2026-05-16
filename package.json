@@ -44,6 +44,7 @@
     "react-activity-calendar": "^3.2.0",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",
+    "react-tooltip": "^6.0.3",
     "recharts": "^3.8.1",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",

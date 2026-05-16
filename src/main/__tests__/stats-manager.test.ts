@@ -81,10 +81,10 @@ describe('StatsManager', () => {
 
   describe('getOverview', () => {
     it('应该正确聚合统计数据', () => {
-      // 准备测试数据
+      // 准备测试数据（使用过去的日期）
       const records: StatsRecord[] = [
         {
-          timestamp: '2026-05-16T06:30:00.000Z',
+          timestamp: '2026-01-15T06:30:00.000Z',
           sessionId: 'session-1',
           model: 'mimo-v2.5-pro',
           provider: 'Mimo',
@@ -95,7 +95,7 @@ describe('StatsManager', () => {
           totalTokens: 1300
         },
         {
-          timestamp: '2026-05-16T07:30:00.000Z',
+          timestamp: '2026-01-15T07:30:00.000Z',
           sessionId: 'session-1',
           model: 'mimo-v2.5-pro',
           provider: 'Mimo',
@@ -106,7 +106,7 @@ describe('StatsManager', () => {
           totalTokens: 650
         },
         {
-          timestamp: '2026-05-15T10:00:00.000Z',
+          timestamp: '2026-01-14T10:00:00.000Z',
           sessionId: 'session-2',
           model: 'claude-opus-4-7',
           provider: 'anthropic',
@@ -124,8 +124,8 @@ describe('StatsManager', () => {
       // 验证总 Token 数
       expect(overview.totalTokens).toBe(2550) // 1300 + 650 + 600
 
-      // 验证活跃天数
-      expect(overview.totalDays).toBe(2)
+      // 验证今日消耗（因为测试数据不是今天的，所以应该是 0）
+      expect(overview.todayTokens).toBe(0)
 
       // 验证会话数
       expect(overview.totalSessions).toBe(2)
@@ -171,7 +171,7 @@ describe('StatsManager', () => {
       const overview = statsManager.getOverview()
 
       expect(overview.totalTokens).toBe(0)
-      expect(overview.totalDays).toBe(0)
+      expect(overview.todayTokens).toBe(0)
       expect(overview.totalSessions).toBe(0)
       expect(overview.modelStats).toHaveLength(0)
       expect(overview.dailyStats).toHaveLength(365) // 仍然生成 365 天框架

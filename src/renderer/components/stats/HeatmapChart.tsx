@@ -1,3 +1,4 @@
+import React, { useState } from 'react'
 import { ActivityCalendar, type Activity } from 'react-activity-calendar'
 
 interface HeatmapChartProps {
@@ -8,6 +9,8 @@ interface HeatmapChartProps {
 }
 
 export function HeatmapChart({ dailyStats }: HeatmapChartProps) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null)
+
   // 转换为 react-activity-calendar 格式
   const activities: Activity[] = dailyStats.map(day => ({
     date: day.date,
@@ -15,11 +18,25 @@ export function HeatmapChart({ dailyStats }: HeatmapChartProps) {
     level: getLevel(day.totalTokens)
   }))
 
+  const handleMouseEnter = (e: React.MouseEvent, activity: Activity) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltip({
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10,
+      content: `${activity.date}: ${activity.count.toLocaleString()} tokens`
+    })
+  }
+
+  const handleMouseLeave = () => {
+    setTooltip(null)
+  }
+
   return (
-    <div className="bg-muted/50 rounded-xl p-4">
+    <div className="bg-muted/50 rounded-xl p-4 relative">
       <h3 className="text-sm font-medium mb-4">过去 365 天使用情况</h3>
       <ActivityCalendar
         data={activities}
+        showWeekdayLabels
         labels={{
           months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
           weekdays: ['日', '一', '二', '三', '四', '五', '六'],
@@ -36,7 +53,21 @@ export function HeatmapChart({ dailyStats }: HeatmapChartProps) {
         fontSize={12}
         blockSize={12}
         blockMargin={2}
+        renderBlock={(block, activity) => (
+          React.cloneElement(block, {
+            onMouseEnter: (e: React.MouseEvent) => handleMouseEnter(e, activity),
+            onMouseLeave: handleMouseLeave
+          })
+        )}
       />
+      {tooltip && (
+        <div
+          className="fixed z-50 px-2 py-1 text-xs bg-foreground text-background rounded shadow-lg pointer-events-none"
+          style={{ left: tooltip.x, top: tooltip.y, transform: 'translate(-50%, -100%)' }}
+        >
+          {tooltip.content}
+        </div>
+      )}
     </div>
   )
 }

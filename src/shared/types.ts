@@ -154,7 +154,7 @@ export interface ModelStats {
 // 统计概览
 export interface OverviewStats {
   totalTokens: number
-  totalDays: number
+  todayTokens: number
   totalSessions: number
   dailyStats: DailyStats[]
   modelStats: ModelStats[]

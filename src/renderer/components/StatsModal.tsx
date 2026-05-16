@@ -71,7 +71,7 @@ export function StatsModal({ isOpen, onClose }: StatsModalProps) {
               {/* 概览卡片 */}
               <StatsOverview
                 totalTokens={overview.totalTokens}
-                totalDays={overview.totalDays}
+                todayTokens={overview.todayTokens}
                 totalSessions={overview.totalSessions}
               />
 
