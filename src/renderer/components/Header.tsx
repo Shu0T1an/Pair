@@ -15,6 +15,7 @@ interface HeaderProps {
   onToggleTheme: () => void
   onOpenSettings: () => void
   onOpenStats: () => void
+  onOpenSkills: () => void
 }
 
 export function Header({
@@ -23,6 +24,7 @@ export function Header({
   onToggleTheme,
   onOpenSettings,
   onOpenStats,
+  onOpenSkills,
 }: HeaderProps) {
   return (
     <TooltipProvider>
@@ -66,6 +68,15 @@ export function Header({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>统计</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" onClick={onOpenSkills}>
+                  <Zap size={14} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Skills</TooltipContent>
             </Tooltip>
 
             <Tooltip>
