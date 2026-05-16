@@ -1,3 +1,4 @@
+import { useEffect, useReducer } from 'react'
 import { useGlobalStream } from '@/renderer/contexts/GlobalStreamContext'
 import { cn } from '@/renderer/lib/utils'
 
@@ -14,9 +15,17 @@ interface SessionStatusIndicatorProps {
  * - idle: 不显示
  */
 export function SessionStatusIndicator({ sessionId, className }: SessionStatusIndicatorProps) {
-  const { getSessionStatus, isSessionStreaming } = useGlobalStream()
+  const { getSessionStatus, isSessionStreaming, subscribe } = useGlobalStream()
   const status = getSessionStatus(sessionId)
   const isStreaming = isSessionStreaming(sessionId)
+
+  // 订阅状态变化，触发重新渲染
+  const [, forceUpdate] = useReducer(x => x + 1, 0)
+  
+  useEffect(() => {
+    const unsubscribe = subscribe(sessionId, forceUpdate)
+    return unsubscribe
+  }, [sessionId, subscribe])
 
   // idle 状态不显示
   if (status === 'idle') return null

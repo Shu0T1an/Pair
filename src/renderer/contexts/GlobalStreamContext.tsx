@@ -175,7 +175,7 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
       notify(event.sessionId)
     })
 
-    // message_end
+    // message_end - 一条消息结束（但 agent 可能还在继续）
     const unsubMessageEnd = ipcClient.onMessageEnd((event) => {
       console.log('[GlobalStream] message_end:', event.sessionId)
       const state = statesRef.current.get(event.sessionId)
@@ -191,8 +191,28 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
         state.streaming.textBuffer = ''
         state.streaming.thinkingBuffer = ''
         state.streaming.isStreaming = false
+        // 注意：message_end 不设置 completed，等 agent_end
+      }
+      notify(event.sessionId)
+    })
+
+    // agent_start - agent 开始处理
+    const unsubAgentStart = ipcClient.onAgentStart((event) => {
+      console.log('[GlobalStream] agent_start:', event.sessionId)
+      const state = getOrCreateState(event.sessionId)
+      state.status = 'streaming'
+      state.toolCalls = []  // 清空之前的工具调用
+      notify(event.sessionId)
+    })
+
+    // agent_end - agent 处理完成
+    const unsubAgentEnd = ipcClient.onAgentEnd((event) => {
+      console.log('[GlobalStream] agent_end:', event.sessionId)
+      const state = statesRef.current.get(event.sessionId)
+      if (state) {
         state.status = 'completed'
         state.completedAt = new Date()
+        state.streaming.isStreaming = false
       }
       notify(event.sessionId)
     })
@@ -235,6 +255,8 @@ export function GlobalStreamProvider({ children }: { children: ReactNode }) {
       unsubMessageEnd()
       unsubToolStart()
       unsubToolEnd()
+      unsubAgentStart()
+      unsubAgentEnd()
     }
   }, [getOrCreateState, notify])
 
