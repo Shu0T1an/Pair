@@ -87,6 +87,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getOverview: () => ipcRenderer.invoke('stats:getOverview'),
   },
 
+  // Skills
+  skills: {
+    list: () => ipcRenderer.invoke('skills:list'),
+  },
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = [

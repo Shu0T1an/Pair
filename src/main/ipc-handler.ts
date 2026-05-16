@@ -126,6 +126,9 @@ export class IPCHandler {
     
     // 统计数据
     ipcMain.handle('stats:getOverview', this.handleGetStatsOverview.bind(this));
+    
+    // Skills
+    ipcMain.handle('skills:list', this.handleListSkills.bind(this));
   }
 
   /**
@@ -535,6 +538,18 @@ export class IPCHandler {
   }
 
   /**
+   * 获取所有 skills
+   */
+  private async handleListSkills() {
+    try {
+      return await this.agentManager.loadSkills();
+    } catch (error) {
+      console.error('[IPCHandler] 获取 skills 失败:', error);
+      return [];
+    }
+  }
+
+  /**
    * 清理资源
    */
   dispose() {
@@ -567,5 +582,6 @@ export class IPCHandler {
     ipcMain.removeHandler('storage:setDataRoot');
     ipcMain.removeHandler('storage:selectFolder');
     ipcMain.removeHandler('stats:getOverview');
+    ipcMain.removeHandler('skills:list');
   }
 }
