@@ -141,8 +141,11 @@ describe('StatsManager', () => {
     })
 
     it('应该生成 365 天的热力图数据', () => {
+      const todayStr = new Date().toISOString().split('T')[0]
+      const todayTimestamp = new Date().toISOString()
+
       statsManager.appendRecords([{
-        timestamp: '2026-05-16T06:30:00.000Z',
+        timestamp: todayTimestamp,
         sessionId: 'session-1',
         model: 'mimo-v2.5-pro',
         provider: 'Mimo',
@@ -159,8 +162,9 @@ describe('StatsManager', () => {
       expect(overview.dailyStats).toHaveLength(365)
       
       // 验证最后一天（今天）有数据
-      const today = overview.dailyStats[overview.dailyStats.length - 1]
-      expect(today.totalTokens).toBe(1300)
+      const lastDay = overview.dailyStats[overview.dailyStats.length - 1]
+      expect(lastDay.date).toBe(todayStr)
+      expect(lastDay.totalTokens).toBe(1300)
       
       // 验证其他天为 0
       const yesterday = overview.dailyStats[overview.dailyStats.length - 2]
