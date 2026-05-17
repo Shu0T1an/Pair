@@ -24,6 +24,7 @@ import { cn } from '@/renderer/lib/utils'
 import type { ToolCall } from '@/shared/types'
 import { MarkdownViewer } from './MarkdownViewer'
 import { useTheme } from '@/renderer/contexts/ThemeContext'
+import { customDiffToUnifiedPatch } from '@/renderer/lib/diff-utils'
 
 // 格式化结果
 function formatResult(result: string | { content?: string | unknown[]; details?: unknown; type?: string; text?: string }): string {
@@ -180,97 +181,6 @@ function getSkillName(toolCall: ToolCall): string | null {
   return after[after.length - 1] || null
 }
 
-// SDK 自定义 diff 格式 → unified diff 格式转换
-// SDK 格式: +NN content / -NN content /  NN content /   ...
-function customDiffToUnifiedPatch(diff: string, filePath: string): string {
-  if (!diff) return ''
-
-  const lines = diff.split('\n')
-  const result: string[] = [
-    `--- a/${filePath}`,
-    `+++ b/${filePath}`,
-  ]
-
-  type Entry = { type: 'add' | 'del' | 'ctx'; oldLine?: number; newLine?: number; content: string }
-
-  let currentHunk: Entry[] = []
-
-  for (const rawLine of lines) {
-    const line = rawLine.trimEnd()
-    if (!line) continue
-
-    // ... skip marker → hunk boundary
-    if (line.trim() === '...') {
-      if (currentHunk.length > 0) {
-        result.push(...buildHunkFromEntries(currentHunk))
-        currentHunk = []
-      }
-      continue
-    }
-
-    const prefix = line[0]
-    if (prefix !== '+' && prefix !== '-' && prefix !== ' ') continue
-
-    const rest = line.slice(1).trimStart()
-
-    // 提取行号和内容: "<lineNum> <content>"
-    const match = rest.match(/^(\d+)\s+(.*)$/)
-    let content: string
-    let oldLine: number | undefined
-    let newLine: number | undefined
-
-    if (match) {
-      const lineNum = parseInt(match[1], 10)
-      content = match[2]
-      if (prefix === '+') {
-        newLine = lineNum
-      } else if (prefix === '-') {
-        oldLine = lineNum
-      } else {
-        oldLine = lineNum
-        newLine = lineNum
-      }
-    } else {
-      content = rest
-    }
-
-    const type = prefix === '+' ? 'add' as const : prefix === '-' ? 'del' as const : 'ctx' as const
-    currentHunk.push({ type, oldLine, newLine, content })
-  }
-
-  if (currentHunk.length > 0) {
-    result.push(...buildHunkFromEntries(currentHunk))
-  }
-
-  return result.join('\n')
-}
-
-// 构建一个 unified diff hunk 块
-function buildHunkFromEntries(
-  entries: { type: 'add' | 'del' | 'ctx'; oldLine?: number; newLine?: number; content: string }[]
-): string[] {
-  if (entries.length === 0) return []
-
-  const oldStart = entries.find(e => e.oldLine !== undefined)?.oldLine ?? 1
-  const newStart = entries.find(e => e.newLine !== undefined)?.newLine ?? 1
-
-  const ctxCount = entries.filter(e => e.type === 'ctx').length
-  const delCount = entries.filter(e => e.type === 'del').length
-  const addCount = entries.filter(e => e.type === 'add').length
-
-  const oldCount = ctxCount + delCount
-  const newCount = ctxCount + addCount
-
-  const body = entries.map(e => {
-    if (e.type === 'ctx') return ` ${e.content}`
-    if (e.type === 'del') return `-${e.content}`
-    return `+${e.content}`
-  })
-
-  return [`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`, ...body]
-}
-
-// 从工具调用参数中提取文件路径
 function getEditFilePath(toolCall: ToolCall): string {
   return (toolCall.args?.path as string) || (toolCall.args?.file as string) || 'file'
 }

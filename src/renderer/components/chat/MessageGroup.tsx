@@ -9,6 +9,7 @@ import type { Message } from '@/shared/types'
 import { useMessageSettings } from '@/renderer/contexts/MessageSettingsContext'
 import { ThinkingBlock } from './ThinkingBlock'
 import { ToolCallPanel } from './ToolCallPanel'
+import { FileChangesPanel } from './FileChangesPanel'
 
 interface MessageGroupProps {
   role: 'user' | 'assistant' | 'system'
@@ -43,6 +44,8 @@ export const MessageGroup = memo(function MessageGroup({ role, messages, modelNa
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 2000)
   }
+  
+  const allToolCalls = messages.flatMap(m => m.toolCalls || [])
   
   // 判断是否是流式消息（取最后一个）
   const lastMessage = messages[messages.length - 1]
@@ -157,6 +160,15 @@ export const MessageGroup = memo(function MessageGroup({ role, messages, modelNa
             )
           })}
         </div>
+        
+        {allToolCalls.length > 0 && (
+          <FileChangesPanel
+            toolCalls={allToolCalls}
+            isStreaming={isGroupStreaming}
+            defaultExpanded={settings.toolCallsDefaultExpanded}
+            fontSize={fontSize}
+          />
+        )}
         
         {/* 时间戳 */}
         {showTimestamp && !isGroupStreaming && (
