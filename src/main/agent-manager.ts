@@ -12,8 +12,8 @@ import type { Model, Api } from '@earendil-works/pi-ai';
 import { EventEmitter } from 'events';
 import path from 'path';
 import fs from 'fs';
-import type { SessionInfo, ProjectSessions, MessageQueueType, MessageQueueStatus, QueuedMessage, ThinkingLevel, ThinkingConfig } from '../shared/types';
-import { DEFAULT_THINKING_BUDGETS } from '../shared/types';
+import type { SessionInfo, ProjectSessions, MessageQueueType, MessageQueueStatus, QueuedMessage, ThinkingLevel, ThinkingConfig } from '../shared/types.js';
+import { DEFAULT_THINKING_BUDGETS } from '../shared/types.js';
 import { StorageManager } from './storage-manager.js';
 import { listAllSessions, findSessionFile, readSessionHeader } from './session-scanner.js';
 import { StatsManager } from './stats-manager.js';
@@ -746,7 +746,7 @@ export class AgentManager extends EventEmitter {
   getQueueStatus(sessionId: string): MessageQueueStatus {
     const queue = this.messageQueues.get(sessionId) || [];
     const entry = this.sessions.get(sessionId);
-    const isAgentWorking = entry ? entry.session.isProcessing : false;
+    const isAgentWorking = entry ? entry.session.isStreaming : false;
     
     return {
       steeringCount: queue.filter(m => m.type === 'steering' && m.status === 'pending').length,
@@ -766,7 +766,7 @@ export class AgentManager extends EventEmitter {
     }
     
     // 如果会话空闲，立即发送
-    if (!entry.session.isProcessing) {
+    if (!entry.session.isStreaming) {
       await entry.session.prompt(text);
       return;
     }
@@ -1189,12 +1189,21 @@ export class AgentManager extends EventEmitter {
           });
           break;
           
-        case 'compaction':
+        case 'compaction_start':
           this.emit('compaction', {
             sessionId,
-            tokensBefore: event.tokensBefore,
-            tokensAfter: event.tokensAfter,
-            summary: event.summary,
+            reason: event.reason,
+            timestamp: new Date(),
+          });
+          break;
+
+        case 'compaction_end':
+          this.emit('compaction', {
+            sessionId,
+            tokensBefore: event.result?.tokensBefore ?? 0,
+            summary: event.result?.summary ?? '',
+            aborted: event.aborted,
+            willRetry: event.willRetry,
             timestamp: new Date(),
           });
           break;
