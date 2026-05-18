@@ -2,12 +2,13 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { ArrowUp, StopCircle, Mic, Paperclip, Brain, MessageSquare } from 'lucide-react'
 import { Button } from '@/renderer/components/ui/button'
 import { cn } from '@/renderer/lib/utils'
-import type { ModelInfo, MessageQueueType, MessageQueueStatus } from '@/shared/types'
+import type { ModelInfo, MessageQueueType, MessageQueueStatus, ThinkingLevel } from '@/shared/types'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/renderer/components/ui/dropdown-menu'
 import { ipcClient } from '@/renderer/ipc-client'
 import { MentionPopup, type FileSearchItem } from './MentionPopup'
 import { CommandPopup, type SlashCommand } from './CommandPopup'
 import { QueueIndicator } from '@/renderer/components/ui/QueueIndicator'
+import { ThinkingLevelSelector } from '@/renderer/components/ui/ThinkingLevelSelector'
 
 interface ChatInputProps {
   currentModel: ModelInfo | null
@@ -21,6 +22,8 @@ interface ChatInputProps {
   onNewSession?: () => void
   onSendQueued?: (text: string, type: MessageQueueType) => void
   queueStatus?: MessageQueueStatus
+  thinkingLevel?: ThinkingLevel
+  onThinkingLevelChange?: (level: ThinkingLevel) => void
 }
 
 // 格式化 token 数量
@@ -46,6 +49,8 @@ export function ChatInput({
   onNewSession,
   onSendQueued,
   queueStatus,
+  thinkingLevel,
+  onThinkingLevelChange,
 }: ChatInputProps) {
   const [inputText, setInputText] = useState('')
   const [contextUsage, setContextUsage] = useState<{ usedTokens: number; totalTokens: number; percentage: number } | null>(null)
@@ -380,6 +385,14 @@ export function ChatInput({
               
               <span className="font-mono">{contextUsage.percentage}%</span>
             </div>
+          )}
+          
+          {/* Thinking级别选择器 */}
+          {thinkingLevel && onThinkingLevelChange && (
+            <ThinkingLevelSelector
+              currentLevel={thinkingLevel}
+              onLevelChange={onThinkingLevelChange}
+            />
           )}
           
           {/* 队列状态指示器 */}
