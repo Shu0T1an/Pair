@@ -221,3 +221,58 @@ export interface McpToolInfo {
   description?: string;
   inputSchema: Record<string, unknown>;
 }
+
+// ── 消息队列类型 ──
+
+/** 消息队列类型 */
+export type MessageQueueType = 'steering' | 'follow-up'
+
+/** 队列消息接口 */
+export interface QueuedMessage {
+  id: string
+  text: string
+  type: MessageQueueType
+  timestamp: Date
+  status: 'pending' | 'sent' | 'cancelled'
+}
+
+/** 消息队列状态 */
+export interface MessageQueueStatus {
+  steeringCount: number
+  followUpCount: number
+  totalCount: number
+  isAgentWorking: boolean
+}
+
+// ── Thinking 级别类型 ──
+
+/** Thinking 级别 */
+export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+
+/** Thinking 配置 */
+export interface ThinkingConfig {
+  globalDefault: ThinkingLevel
+  sessionOverrides: Record<string, ThinkingLevel>
+  thinkingBudgets: Record<ThinkingLevel, number>
+}
+
+/** 默认 Thinking 预算 */
+export const DEFAULT_THINKING_BUDGETS: Record<ThinkingLevel, number> = {
+  off: 0,
+  minimal: 1024,
+  low: 4096,
+  medium: 10240,
+  high: 32768,
+  xhigh: 65536,
+}
+
+// ── 上下文压缩类型 ──
+
+/** 压缩事件 */
+export interface CompactionEvent {
+  sessionId: string
+  tokensBefore: number
+  tokensAfter: number
+  summary: string
+  timestamp: Date
+}
