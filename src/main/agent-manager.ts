@@ -12,7 +12,8 @@ import type { Model, Api } from '@earendil-works/pi-ai';
 import { EventEmitter } from 'events';
 import path from 'path';
 import fs from 'fs';
-import type { SessionInfo, ProjectSessions } from '../shared/types';
+import type { SessionInfo, ProjectSessions, MessageQueueType, MessageQueueStatus, QueuedMessage, ThinkingLevel, ThinkingConfig } from '../shared/types';
+import { DEFAULT_THINKING_BUDGETS } from '../shared/types';
 import { StorageManager } from './storage-manager.js';
 import { listAllSessions, findSessionFile, readSessionHeader } from './session-scanner.js';
 import { StatsManager } from './stats-manager.js';
@@ -63,6 +64,16 @@ export class AgentManager extends EventEmitter {
   private statsManager: StatsManager;
   private modelsJsonPath: string;
   private mcpRegistry: McpServerRegistry;
+  
+  // 消息队列状态
+  private messageQueues: Map<string, QueuedMessage[]> = new Map();
+  
+  // Thinking 级别状态
+  private thinkingConfig: ThinkingConfig = {
+    globalDefault: 'medium',
+    sessionOverrides: {},
+    thinkingBudgets: DEFAULT_THINKING_BUDGETS,
+  };
 
   constructor(storageManager: StorageManager, mcpRegistry?: McpServerRegistry) {
     super();
@@ -727,6 +738,130 @@ export class AgentManager extends EventEmitter {
     await entry.session.abort();
   }
 
+  // ── 消息队列 ──
+
+  /**
+   * 获取队列状态
+   */
+  getQueueStatus(sessionId: string): MessageQueueStatus {
+    const queue = this.messageQueues.get(sessionId) || [];
+    const entry = this.sessions.get(sessionId);
+    const isAgentWorking = entry ? entry.session.isProcessing : false;
+    
+    return {
+      steeringCount: queue.filter(m => m.type === 'steering' && m.status === 'pending').length,
+      followUpCount: queue.filter(m => m.type === 'follow-up' && m.status === 'pending').length,
+      totalCount: queue.filter(m => m.status === 'pending').length,
+      isAgentWorking,
+    };
+  }
+
+  /**
+   * 发送队列消息
+   */
+  async sendQueuedMessage(sessionId: string, text: string, type: MessageQueueType): Promise<void> {
+    const entry = this.sessions.get(sessionId);
+    if (!entry) {
+      throw new Error(`会话 ${sessionId} 不存在`);
+    }
+    
+    // 如果会话空闲，立即发送
+    if (!entry.session.isProcessing) {
+      await entry.session.prompt(text);
+      return;
+    }
+    
+    // 会话忙碌，添加到队列
+    const queuedMessage: QueuedMessage = {
+      id: `queue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      text,
+      type,
+      timestamp: new Date(),
+      status: 'pending',
+    };
+    
+    const queue = this.messageQueues.get(sessionId) || [];
+    queue.push(queuedMessage);
+    this.messageQueues.set(sessionId, queue);
+    
+    // 发送队列状态更新事件
+    this.emit('queue_status', {
+      sessionId,
+      status: this.getQueueStatus(sessionId),
+    });
+  }
+
+  /**
+   * 处理队列中的消息
+   */
+  private async processQueue(sessionId: string): Promise<void> {
+    const queue = this.messageQueues.get(sessionId);
+    if (!queue || queue.length === 0) return;
+    
+    const entry = this.sessions.get(sessionId);
+    if (!entry) return;
+    
+    // 找到下一个待发送的消息
+    const nextMessage = queue.find(m => m.status === 'pending');
+    if (!nextMessage) return;
+    
+    // 标记为已发送
+    nextMessage.status = 'sent';
+    
+    // 发送消息
+    try {
+      if (nextMessage.type === 'steering') {
+        // Steering 消息：使用 steering 模式
+        await entry.session.prompt(nextMessage.text, { steering: true } as any);
+      } else {
+        // Follow-up 消息：正常发送
+        await entry.session.prompt(nextMessage.text);
+      }
+    } catch (error) {
+      console.error('发送队列消息失败:', error);
+      nextMessage.status = 'cancelled';
+    }
+    
+    // 清理已发送/已取消的消息
+    this.messageQueues.set(sessionId, queue.filter(m => m.status === 'pending'));
+    
+    // 发送队列状态更新事件
+    this.emit('queue_status', {
+      sessionId,
+      status: this.getQueueStatus(sessionId),
+    });
+  }
+
+  // ── Thinking 级别 ──
+
+  /**
+   * 获取 Thinking 级别
+   */
+  getThinkingLevel(sessionId: string): ThinkingLevel {
+    return this.thinkingConfig.sessionOverrides[sessionId] || this.thinkingConfig.globalDefault;
+  }
+
+  /**
+   * 设置 Thinking 级别
+   */
+  async setThinkingLevel(sessionId: string, level: ThinkingLevel): Promise<void> {
+    const entry = this.sessions.get(sessionId);
+    if (!entry) {
+      throw new Error(`会话 ${sessionId} 不存在`);
+    }
+    
+    // 更新会话覆盖
+    this.thinkingConfig.sessionOverrides[sessionId] = level;
+    
+    // 如果会话有模型，更新 thinking 级别
+    if (entry.session.model) {
+      const budget = this.thinkingConfig.thinkingBudgets[level];
+      // 注意：这里需要调用 pi SDK 的方法设置 thinking 级别
+      // 具体实现取决于 pi SDK 的 API
+      console.log(`设置会话 ${sessionId} 的 Thinking 级别为 ${level}，预算 ${budget} tokens`);
+    }
+  }
+
   /**
    * 订阅会话事件
    */
@@ -1034,6 +1169,8 @@ export class AgentManager extends EventEmitter {
           });
           // 采集统计数据
           this.collectStats(sessionId, event.messages);
+          // 处理队列中的消息
+          this.processQueue(sessionId);
           break;
 
         case 'turn_start':
