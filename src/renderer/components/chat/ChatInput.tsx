@@ -9,6 +9,7 @@ import { MentionPopup, type FileSearchItem } from './MentionPopup'
 import { CommandPopup, type SlashCommand } from './CommandPopup'
 import { QueueIndicator } from '@/renderer/components/ui/QueueIndicator'
 import { ThinkingLevelSelector } from '@/renderer/components/ui/ThinkingLevelSelector'
+import { ContextRing } from '@/renderer/components/ui/ContextRing'
 
 interface ChatInputProps {
   currentModel: ModelInfo | null
@@ -353,38 +354,14 @@ export function ChatInput({
             </DropdownMenuContent>
           </DropdownMenu>
           
-          {/* 上下文使用情况 */}
+          {/* 上下文使用情况 - 环状设计 */}
           {contextUsage && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <span>上下文:</span>
-                <span className={cn(
-                  'font-mono',
-                  contextUsage.percentage > 90 ? 'text-red-500' : 
-                  contextUsage.percentage > 70 ? 'text-yellow-500' : 
-                  'text-green-500'
-                )}>
-                  {formatTokens(contextUsage.usedTokens)}
-                </span>
-                <span>/</span>
-                <span className="font-mono">{formatTokens(contextUsage.totalTokens)}</span>
-              </div>
-              
-              {/* 进度条 */}
-              <div className="w-16 h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden">
-                <div 
-                  className={cn(
-                    'h-full rounded-full transition-all duration-300',
-                    contextUsage.percentage > 90 ? 'bg-red-500' : 
-                    contextUsage.percentage > 70 ? 'bg-yellow-500' : 
-                    'bg-green-500'
-                  )}
-                  style={{ width: `${Math.min(100, contextUsage.percentage)}%` }}
-                />
-              </div>
-              
-              <span className="font-mono">{contextUsage.percentage}%</span>
-            </div>
+            <ContextRing 
+              percentage={contextUsage.percentage}
+              totalTokens={contextUsage.totalTokens}
+              usedTokens={contextUsage.usedTokens}
+              compactionThreshold={87}
+            />
           )}
           
           {/* Thinking级别选择器 */}
