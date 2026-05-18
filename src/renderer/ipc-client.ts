@@ -1,4 +1,4 @@
-import type { SessionInfo, ProjectSessions, NotificationConfig, OverviewStats } from '@/shared/types';
+import type { SessionInfo, ProjectSessions, NotificationConfig, OverviewStats, McpServerConfig, McpServerStatus, McpToolInfo } from '@/shared/types';
 
 // 事件数据类型定义
 export interface MessageStartEvent {
@@ -169,6 +169,19 @@ interface ElectronAPI {
   file: {
     search: (projectPath: string, query: string) => Promise<any[]>;
     readContent: (filePath: string) => Promise<string | null>;
+  };
+
+  // MCP 服务器管理
+  mcp: {
+    listServers: () => Promise<McpServerConfig[]>;
+    addServer: (config: McpServerConfig) => Promise<McpServerConfig[]>;
+    removeServer: (id: string) => Promise<McpServerConfig[]>;
+    connect: (config: McpServerConfig) => Promise<void>;
+    disconnect: (id: string) => Promise<void>;
+    reconnect: (id: string) => Promise<void>;
+    getStatus: (id: string) => Promise<McpServerStatus | undefined>;
+    getAllStatuses: () => Promise<McpServerStatus[]>;
+    getTools: (id: string) => Promise<any[]>;
   };
 }
 
@@ -589,6 +602,53 @@ export class IPCClient {
   removeAllListeners(): void {
     this.listeners.forEach((unsubscribe) => unsubscribe());
     this.listeners.clear();
+  }
+
+  // ── MCP 服务器管理 ──
+
+  async listMcpServers(): Promise<McpServerConfig[]> {
+    if (!this.isElectron()) return [];
+    return window.electronAPI.mcp.listServers();
+  }
+
+  async addMcpServer(config: McpServerConfig): Promise<McpServerConfig[]> {
+    if (!this.isElectron()) return [];
+    return window.electronAPI.mcp.addServer(config);
+  }
+
+  async removeMcpServer(id: string): Promise<McpServerConfig[]> {
+    if (!this.isElectron()) return [];
+    return window.electronAPI.mcp.removeServer(id);
+  }
+
+  async connectMcpServer(config: McpServerConfig): Promise<void> {
+    if (!this.isElectron()) return;
+    return window.electronAPI.mcp.connect(config);
+  }
+
+  async disconnectMcpServer(id: string): Promise<void> {
+    if (!this.isElectron()) return;
+    return window.electronAPI.mcp.disconnect(id);
+  }
+
+  async reconnectMcpServer(id: string): Promise<void> {
+    if (!this.isElectron()) return;
+    return window.electronAPI.mcp.reconnect(id);
+  }
+
+  async getMcpServerStatus(id: string): Promise<McpServerStatus | undefined> {
+    if (!this.isElectron()) return undefined;
+    return window.electronAPI.mcp.getStatus(id);
+  }
+
+  async getAllMcpServerStatuses(): Promise<McpServerStatus[]> {
+    if (!this.isElectron()) return [];
+    return window.electronAPI.mcp.getAllStatuses();
+  }
+
+  async getMcpServerTools(id: string): Promise<any[]> {
+    if (!this.isElectron()) return [];
+    return window.electronAPI.mcp.getTools(id);
   }
 
   // ── 文件搜索 ──

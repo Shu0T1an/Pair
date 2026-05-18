@@ -17,7 +17,8 @@ import {
   List,
   Code,
   Clock,
-  BookOpen
+  BookOpen,
+  Globe
 } from 'lucide-react'
 import { PatchDiff } from '@pierre/diffs/react'
 import { cn } from '@/renderer/lib/utils'
@@ -65,6 +66,21 @@ function formatDuration(startTime?: Date, endTime?: Date): string {
 function getToolSummary(toolName: string, args?: Record<string, unknown>): string {
   if (!args) return ''
   const name = toolName.toLowerCase()
+  const parts = name.split('__')
+  const baseName = parts.length > 1 ? parts[1] : name
+  
+  if (baseName === 'tavily_search') {
+    const query = args.query
+    return query ? String(query) : ''
+  }
+  if (baseName === 'tavily_extract') {
+    const urls = args.urls
+    if (Array.isArray(urls) && urls.length > 0) {
+      const url = String(urls[0])
+      return url.length > 60 ? url.slice(0, 57) + '...' : url
+    }
+    return ''
+  }
   
   switch (name) {
     case 'read': {
@@ -83,7 +99,7 @@ function getToolSummary(toolName: string, args?: Record<string, unknown>): strin
       const cmd = args.command || args.cmd
       if (cmd) {
         const cmdStr = String(cmd)
-        // 截断过长的命令
+        // 截断过长的命令（必要，避免 UI 溢出）
         return cmdStr.length > 60 ? cmdStr.slice(0, 57) + '...' : cmdStr
       }
       return ''
@@ -115,6 +131,11 @@ function getToolSummary(toolName: string, args?: Record<string, unknown>): strin
 function getToolIcon(toolName: string, iconScale: number) {
   const s = Math.round(14 * iconScale)
   const name = toolName.toLowerCase()
+  const parts = name.split('__')
+  const baseName = parts.length > 1 ? parts[1] : name
+  if (baseName.startsWith('tavily_')) {
+    return <Globe size={s} className="text-sky-500" />
+  }
   switch (name) {
     case 'read':
       return <FileText size={s} className="text-blue-500" />

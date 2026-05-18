@@ -178,3 +178,46 @@ export interface SkillInfo {
   scope: 'user' | 'project' | 'temporary';
   disableModelInvocation: boolean;
 }
+
+// ── MCP (Model Context Protocol) 类型 ──
+
+/** MCP 服务器配置 */
+export interface McpServerConfig {
+  /** 唯一标识 */
+  id: string;
+  /** 显示名称 */
+  name: string;
+  /** 可执行文件路径 */
+  command: string;
+  /** 命令行参数 */
+  args: string[];
+  /** 环境变量 */
+  env?: Record<string, string>;
+  /** 配置作用域: global (用户级, ~/.pair/) 或 project (项目级, .pair/) */
+  scope?: 'global' | 'project';
+  /** 是否随应用启动自动连接 */
+  autoStart?: boolean;
+  /** 是否禁用 */
+  disabled?: boolean;
+}
+
+/** MCP 服务器连接状态 */
+export type McpConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+/** MCP 服务器状态（用于 IPC 传输） */
+export interface McpServerStatus {
+  id: string;
+  name: string;
+  status: McpConnectionStatus;
+  toolCount: number;
+  error?: string;
+}
+
+/** MCP 工具信息（用于 IPC 传输） */
+export interface McpToolInfo {
+  serverId: string;
+  serverName: string;
+  name: string;
+  description?: string;
+  inputSchema: Record<string, unknown>;
+}

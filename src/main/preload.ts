@@ -100,6 +100,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('file:readContent', filePath),
   },
 
+  // MCP 服务器管理
+  mcp: {
+    listServers: () => ipcRenderer.invoke('mcp:listServers'),
+    addServer: (config: any) => ipcRenderer.invoke('mcp:addServer', config),
+    removeServer: (id: string) => ipcRenderer.invoke('mcp:removeServer', id),
+    connect: (config: any) => ipcRenderer.invoke('mcp:connect', config),
+    disconnect: (id: string) => ipcRenderer.invoke('mcp:disconnect', id),
+    reconnect: (id: string) => ipcRenderer.invoke('mcp:reconnect', id),
+    getStatus: (id: string) => ipcRenderer.invoke('mcp:getStatus', id),
+    getAllStatuses: () => ipcRenderer.invoke('mcp:getAllStatuses'),
+    getTools: (id: string) => ipcRenderer.invoke('mcp:getTools', id),
+  },
+
   // 事件订阅
   on: (channel: string, callback: (...args: any[]) => void) => {
     const validChannels = [

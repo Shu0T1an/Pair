@@ -7,6 +7,7 @@ import { TabBar } from '@/renderer/components/TabBar'
 import { SettingsModal } from '@/renderer/components/SettingsModal'
 import { StatsModal } from '@/renderer/components/StatsModal'
 import { SkillsModal } from '@/renderer/components/SkillsModal'
+import { McpModal } from '@/renderer/components/McpModal'
 import { useSessions } from '@/renderer/hooks/useSessions'
 import { useMessages } from '@/renderer/hooks/useMessages'
 import { useModels } from '@/renderer/hooks/useModels'
@@ -18,6 +19,7 @@ export function ChatPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isStatsOpen, setIsStatsOpen] = useState(false)
   const [isSkillsOpen, setIsSkillsOpen] = useState(false)
+  const [isMcpOpen, setIsMcpOpen] = useState(false)
   const { isDark, toggleDark } = useTheme()
   const { addTab, closeTab, closeAllTabs, getTabSessions } = useTabState()
   
@@ -132,6 +134,7 @@ export function ChatPage() {
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenStats={() => setIsStatsOpen(true)}
             onOpenSkills={() => setIsSkillsOpen(true)}
+            onOpenMcp={() => setIsMcpOpen(true)}
           />
           <TabBar
             tabs={tabSessions}
@@ -179,6 +182,12 @@ export function ChatPage() {
       <SkillsModal
         isOpen={isSkillsOpen}
         onClose={() => setIsSkillsOpen(false)}
+      />
+
+      {/* MCP 服务器管理 */}
+      <McpModal
+        isOpen={isMcpOpen}
+        onClose={() => setIsMcpOpen(false)}
       />
     </div>
   )

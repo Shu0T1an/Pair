@@ -3,6 +3,7 @@ import path from 'path';
 import { AgentManager } from './agent-manager.js';
 import { IPCHandler } from './ipc-handler.js';
 import { StorageManager } from './storage-manager.js';
+import { McpServerRegistry } from './mcp/mcp-server-registry.js';
 
 // 禁用 GPU 加速（可选，解决某些显卡问题）
 // app.disableHardwareAcceleration();
@@ -16,7 +17,8 @@ let mainWindow: BrowserWindow | null = null;
 
 // 先创建 StorageManager，再注入 AgentManager
 const storageManager = new StorageManager();
-const agentManager = new AgentManager(storageManager);
+const mcpRegistry = new McpServerRegistry();
+const agentManager = new AgentManager(storageManager, mcpRegistry);
 const ipcHandler = new IPCHandler(agentManager, storageManager);
 
 function createWindow() {
@@ -72,6 +74,11 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow();
 
+  // 自动连接 MCP 服务器
+  mcpRegistry.connectAllAutoStart().catch(err =>
+    console.error('[Main] 自动连接 MCP 服务器失败:', err)
+  );
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -84,4 +91,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+// 应用退出前断开所有 MCP 连接
+app.on('before-quit', async () => {
+  await mcpRegistry.disconnectAll();
 });

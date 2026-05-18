@@ -1,6 +1,7 @@
 import {
   BarChart3,
   BookOpen,
+  Plug,
   Settings,
   Moon,
   Sun,
@@ -17,6 +18,7 @@ interface HeaderProps {
   onOpenSettings: () => void
   onOpenStats: () => void
   onOpenSkills: () => void
+  onOpenMcp?: () => void
 }
 
 export function Header({
@@ -26,6 +28,7 @@ export function Header({
   onOpenSettings,
   onOpenStats,
   onOpenSkills,
+  onOpenMcp,
 }: HeaderProps) {
   return (
     <TooltipProvider>
@@ -79,6 +82,17 @@ export function Header({
               </TooltipTrigger>
               <TooltipContent>Skills</TooltipContent>
             </Tooltip>
+
+            {onOpenMcp && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" onClick={onOpenMcp}>
+                    <Plug size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>MCP 服务器</TooltipContent>
+              </Tooltip>
+            )}
 
             <Tooltip>
               <TooltipTrigger asChild>

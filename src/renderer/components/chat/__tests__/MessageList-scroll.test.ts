@@ -63,8 +63,9 @@ function createScrollLogic() {
     const isBottom = scrollHeight - scrollTop - clientHeight <= 50
 
     if (isStreaming) {
-      // 流式期间：只有用户没有向上滚动过（仍在底部）时才自动滚动
-      return !userScrolledUp && isBottom
+      // 流式期间：只要用户没主动向上滚动，就一直跟随底部
+      // 不检查 isBottom —— 内容增长后 scrollTop 不会自动更新，isBottom 会变成 false
+      return !userScrolledUp
     } else {
       // 流式结束后（agent_end）：如果用户之前没主动向上滚动，确认滚到底部
       return !userScrolledUp && !isBottom
@@ -286,14 +287,14 @@ describe('MessageList 滑动逻辑', () => {
       expect(result).toBe(true)
     })
 
-    it('距离底部 51px，应该认为不在底部', () => {
-      // 距离底部 51px
+    it('距离底部 51px（内容增长导致），应该继续滚动', () => {
+      // 距离底部 51px — 用户没滚走，是内容增长导致的偏移
       container.scrollTop = 449
       container.scrollHeight = 1000
       container.clientHeight = 500
 
       const result = scrollLogic.shouldAutoScroll(container, true, true)
-      expect(result).toBe(false) // 距离底部 51px，不在底部，不自动滚动
+      expect(result).toBe(true) // 用户没主动滚走，内容增长导致偏移，应该继续跟随
     })
 
     it('距离底部 51px 且用户向上滚动过，不应该自动滚动', () => {

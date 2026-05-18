@@ -5,7 +5,8 @@ import {
   ModelRegistry,
   loadSkills as loadPiSkills,
   type AgentSession,
-  type CreateAgentSessionOptions
+  type CreateAgentSessionOptions,
+  type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 import type { Model, Api } from '@earendil-works/pi-ai';
 import { EventEmitter } from 'events';
@@ -15,6 +16,7 @@ import type { SessionInfo, ProjectSessions } from '../shared/types';
 import { StorageManager } from './storage-manager.js';
 import { listAllSessions, findSessionFile, readSessionHeader } from './session-scanner.js';
 import { StatsManager } from './stats-manager.js';
+import { McpServerRegistry, getAllMcpAgentTools } from './mcp/index.js';
 
 // 自定义模型配置接口
 interface CustomModelConfig {
@@ -60,10 +62,12 @@ export class AgentManager extends EventEmitter {
   private storageManager: StorageManager;
   private statsManager: StatsManager;
   private modelsJsonPath: string;
+  private mcpRegistry: McpServerRegistry;
 
-  constructor(storageManager: StorageManager) {
+  constructor(storageManager: StorageManager, mcpRegistry?: McpServerRegistry) {
     super();
     this.storageManager = storageManager;
+    this.mcpRegistry = mcpRegistry || new McpServerRegistry();
     this.authStorage = AuthStorage.create();
     this.modelRegistry = ModelRegistry.create(this.authStorage);
     this.statsManager = new StatsManager(storageManager.getDataRoot());
@@ -78,6 +82,26 @@ export class AgentManager extends EventEmitter {
    */
   getStatsManager(): StatsManager {
     return this.statsManager;
+  }
+
+  /**
+   * 获取 MCP 注册表
+   */
+  getMcpRegistry(): McpServerRegistry {
+    return this.mcpRegistry;
+  }
+
+  getMcpToolDefinitions(): ToolDefinition[] {
+    return getAllMcpAgentTools(this.mcpRegistry);
+  }
+
+  /**
+   * 连接项目级 MCP 服务器并获取所有可用工具
+   */
+  private async ensureProjectMcpTools(projectPath: string): Promise<ToolDefinition[]> {
+    // 连接项目级 MCP 服务器（已有连接时 registry 内部会跳过）
+    await this.mcpRegistry.connectProjectServers(projectPath);
+    return this.getMcpToolDefinitions();
   }
 
   /**
@@ -123,11 +147,14 @@ export class AgentManager extends EventEmitter {
     }
     const sessionManager = SessionManager.create(options.projectPath, sessionDir);
     
+    const mcpTools = await this.ensureProjectMcpTools(options.projectPath);
+
     const sessionOptions: CreateAgentSessionOptions = {
       sessionManager,
       authStorage: this.authStorage,
       modelRegistry: this.modelRegistry,
       cwd: options.projectPath,
+      ...(mcpTools.length > 0 ? { customTools: mcpTools } : {}),
     };
 
     const { session } = await createAgentSession(sessionOptions);
@@ -191,35 +218,45 @@ export class AgentManager extends EventEmitter {
       throw new Error(`会话 ${sessionId} 不存在`);
     }
 
-    // 打开已有的会话文件
+    // 先读取 session 文件 header，获取 cwd（工作目录）和名称
+    let sessionCwd = '';
+    let sessionName = '未命名会话';
+    try {
+      const header = await readSessionHeader(sessionFile);
+      if (header) {
+        sessionCwd = header.cwd || '';
+        sessionName = header.name || '未命名会话';
+      }
+    } catch (error) {
+      console.error('读取会话 header 失败:', error);
+    }
+
     const sessionManager = SessionManager.open(sessionFile);
-    
+
+    // 恢复会话时也确保项目 MCP 连接
+    let mcpTools: ToolDefinition[] = [];
+    if (sessionCwd) {
+      mcpTools = await this.ensureProjectMcpTools(sessionCwd);
+    } else {
+      mcpTools = this.getMcpToolDefinitions();
+    }
+
     const sessionOptions: CreateAgentSessionOptions = {
       sessionManager,
       authStorage: this.authStorage,
       modelRegistry: this.modelRegistry,
-      cwd: '',
+      cwd: sessionCwd,
+      ...(mcpTools.length > 0 ? { customTools: mcpTools } : {}),
     };
 
     const { session } = await createAgentSession(sessionOptions);
-
-    // 从 session 文件读取名称，确保与 listSessions 扫描结果一致
-    let sessionName = '未命名会话';
-    try {
-      const header = await readSessionHeader(sessionFile);
-      if (header?.name) {
-        sessionName = header.name;
-      }
-    } catch (error) {
-      console.error('读取会话名称失败:', error);
-    }
 
     // 构建 SessionInfo
     const now = new Date();
     const info: SessionInfo = {
       id: session.sessionId,
       name: sessionName,
-      projectPath: session.sessionManager.getCwd?.() || '',
+      projectPath: sessionCwd,
       createdAt: now,
       updatedAt: now,
       messageCount: session.messages.length,

@@ -171,6 +171,20 @@ describe('AgentManager', () => {
     expect(info?.name).toBe('重启后名称');
   });
 
+  it('should preserve cwd/projectPath after resumeSession (simulating app restart)', async () => {
+    const projectPath = '/test/project/path';
+    const manager1 = createAgentManager(testDir);
+    const session = await manager1.createSession({ projectPath });
+
+    // 第二个 manager 模拟重启，resume session
+    const manager2 = createAgentManager(testDir);
+    await manager2.resumeSession(session.id);
+    const info = manager2.getSessionInfo(session.id);
+
+    // cwd/projectPath 应该与创建时一致
+    expect(info?.projectPath).toBe(projectPath);
+  });
+
   it('should update session_info line when file already has one', async () => {
     const manager = createAgentManager(testDir);
     const session = await manager.createSession({ projectPath: '/test' });

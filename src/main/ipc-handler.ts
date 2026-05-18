@@ -3,7 +3,8 @@ import { AgentManager } from './agent-manager.js';
 import { StorageManager } from './storage-manager.js';
 import { NotificationManager } from './notification.js';
 import { searchProjectFiles, readFileContent } from './file-scanner.js';
-import type { SessionInfo, ProjectSessions, NotificationConfig } from '../shared/types.js';
+import { McpServerRegistry } from './mcp/mcp-server-registry.js';
+import type { SessionInfo, ProjectSessions, NotificationConfig, McpServerConfig } from '../shared/types.js';
 import { DEFAULT_NOTIFICATION_CONFIG } from '../shared/types.js';
 
 export class IPCHandler {
@@ -12,10 +13,12 @@ export class IPCHandler {
   private mainWindow: BrowserWindow | null = null;
   private eventListeners: Map<string, (...args: any[]) => void> = new Map();
   private notificationManager: NotificationManager | null = null;
+  private mcpRegistry: McpServerRegistry;
 
   constructor(agentManager: AgentManager, storageManager: StorageManager) {
     this.agentManager = agentManager;
     this.storageManager = storageManager;
+    this.mcpRegistry = agentManager.getMcpRegistry();
     this.registerHandlers();
   }
 
@@ -133,6 +136,17 @@ export class IPCHandler {
 
     ipcMain.handle('file:search', this.handleFileSearch.bind(this));
     ipcMain.handle('file:readContent', this.handleFileReadContent.bind(this));
+
+    // MCP 服务器管理
+    ipcMain.handle('mcp:listServers', this.handleMcpListServers.bind(this));
+    ipcMain.handle('mcp:addServer', this.handleMcpAddServer.bind(this));
+    ipcMain.handle('mcp:removeServer', this.handleMcpRemoveServer.bind(this));
+    ipcMain.handle('mcp:connect', this.handleMcpConnect.bind(this));
+    ipcMain.handle('mcp:disconnect', this.handleMcpDisconnect.bind(this));
+    ipcMain.handle('mcp:reconnect', this.handleMcpReconnect.bind(this));
+    ipcMain.handle('mcp:getStatus', this.handleMcpGetStatus.bind(this));
+    ipcMain.handle('mcp:getAllStatuses', this.handleMcpGetAllStatuses.bind(this));
+    ipcMain.handle('mcp:getTools', this.handleMcpGetTools.bind(this));
   }
 
   /**
@@ -577,6 +591,45 @@ export class IPCHandler {
     }
   }
 
+  // ── MCP 服务器管理 ──
+
+  private async handleMcpListServers(): Promise<McpServerConfig[]> {
+    return this.mcpRegistry.getAllConfigs();
+  }
+
+  private async handleMcpAddServer(_event: any, config: McpServerConfig): Promise<McpServerConfig[]> {
+    return this.mcpRegistry.addServer(config);
+  }
+
+  private async handleMcpRemoveServer(_event: any, id: string): Promise<McpServerConfig[]> {
+    await this.mcpRegistry.disconnectServer(id);
+    return this.mcpRegistry.removeServer(id);
+  }
+
+  private async handleMcpConnect(_event: any, config: McpServerConfig): Promise<void> {
+    await this.mcpRegistry.connectServer(config);
+  }
+
+  private async handleMcpDisconnect(_event: any, id: string): Promise<void> {
+    await this.mcpRegistry.disconnectServer(id);
+  }
+
+  private async handleMcpReconnect(_event: any, id: string): Promise<void> {
+    await this.mcpRegistry.reconnectServer(id);
+  }
+
+  private handleMcpGetStatus(_event: any, id: string) {
+    return this.mcpRegistry.getServerStatus(id);
+  }
+
+  private handleMcpGetAllStatuses() {
+    return this.mcpRegistry.getAllServerStatuses();
+  }
+
+  private handleMcpGetTools(_event: any, id: string) {
+    return this.mcpRegistry.getServerTools(id);
+  }
+
   /**
    * 清理资源
    */
@@ -613,5 +666,14 @@ export class IPCHandler {
     ipcMain.removeHandler('skills:list');
     ipcMain.removeHandler('file:search');
     ipcMain.removeHandler('file:readContent');
+    ipcMain.removeHandler('mcp:listServers');
+    ipcMain.removeHandler('mcp:addServer');
+    ipcMain.removeHandler('mcp:removeServer');
+    ipcMain.removeHandler('mcp:connect');
+    ipcMain.removeHandler('mcp:disconnect');
+    ipcMain.removeHandler('mcp:reconnect');
+    ipcMain.removeHandler('mcp:getStatus');
+    ipcMain.removeHandler('mcp:getAllStatuses');
+    ipcMain.removeHandler('mcp:getTools');
   }
 }

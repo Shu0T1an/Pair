@@ -98,8 +98,10 @@ export function MessageList({ messages, modelName, isStreaming, onSendMessage, f
     const isBottom = scrollHeight - scrollTop - clientHeight < 50
     
     if (isStreaming) {
-      // 流式期间：只有用户没有向上滚动过（仍在底部）时才自动滚动
-      if (!userScrolledUpRef.current && isBottom) {
+      // 流式期间：只要用户没主动向上滚动，就一直跟随底部
+      // 不检查 isBottom —— 内容增长后 scrollTop 不会自动更新，isBottom 会变成 false
+      // 但用户实际并没有滚走，userScrolledUpRef 才是正确的判断依据
+      if (!userScrolledUpRef.current) {
         scrollToBottomImmediate()
       }
     } else if (!isStreaming) {
