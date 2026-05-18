@@ -112,6 +112,9 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
     if (sessionId) {
       loadMessages(sessionId)
       
+      // 始终同步当前会话的流式状态，避免跨会话残留
+      setIsStreaming(isSessionStreaming(sessionId))
+      
       // 检查是否有正在进行的流式消息
       const streamingMessage = getStreamingMessage(sessionId)
       if (streamingMessage && !isCancelledRef.current) {
@@ -125,10 +128,10 @@ export function useMessages({ sessionId, messagesCache, currentModelId, modelCon
           // 添加新的流式消息
           return [...prev, streamingMessage]
         })
-        setIsStreaming(isSessionStreaming(sessionId))
       }
     } else {
       setMessages([])
+      setIsStreaming(false)
     }
     
     return () => {

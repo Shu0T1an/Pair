@@ -40,8 +40,9 @@ export function ChatArea({
         fontSize={fontSize}
       />
       
-      {/* 输入框 */}
+      {/* 输入框 — 用 key 隔离不同会话的输入状态 */}
       <ChatInput
+        key={sessionId || 'no-session'}
         currentModel={currentModel}
         models={models}
         isStreaming={isStreaming}
