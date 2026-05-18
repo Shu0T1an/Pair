@@ -335,14 +335,17 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false,
                     )}
                     
                     {/* 结果 */}
-                    {toolCall.result && (
+                    {(toolCall.result || (toolCall.name === 'write' && toolCall.args?.content)) && (
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-foreground font-medium">输出结果</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleCopy(formatResult(toolCall.result!), `result-${toolCall.id}`)
+                              const copyContent = toolCall.name === 'write' && toolCall.args?.content
+                                ? String(toolCall.args.content)
+                                : formatResult(toolCall.result!)
+                              handleCopy(copyContent, `result-${toolCall.id}`)
                             }}
                             className="text-muted-foreground hover:text-foreground"
                           >
@@ -360,6 +363,10 @@ export function ToolCallPanel({ toolCalls, isStreaming, defaultExpanded = false,
                               }}
                             />
                           </div>
+                        ) : toolCall.name === 'write' && toolCall.args?.content ? (
+                          <pre className="text-foreground bg-muted p-2 rounded-md overflow-x-auto max-h-96 font-mono whitespace-pre-wrap border border-border/50">
+                            {String(toolCall.args.content)}
+                          </pre>
                         ) : isMarkdownRead(toolCall) ? (
                           <MarkdownViewer content={toolCall.result} title={skillName} />
                         ) : (
