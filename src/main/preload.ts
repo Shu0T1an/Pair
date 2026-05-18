@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     send: (sessionId: string, text: string, modelConfig?: string | { provider: string; baseUrl: string; apiKey: string; modelId: string; modelName?: string; api?: string }) => 
       ipcRenderer.invoke('message:send', sessionId, text, modelConfig),
     abort: (sessionId: string) => ipcRenderer.invoke('message:abort', sessionId),
+    sendQueued: (sessionId: string, text: string, type: 'steering' | 'follow-up') => 
+      ipcRenderer.invoke('message:sendQueued', sessionId, text, type),
+    getQueueStatus: (sessionId: string) => 
+      ipcRenderer.invoke('message:getQueueStatus', sessionId),
   },
 
   // 模型管理
@@ -57,6 +61,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('model:syncConfig', config),
     removeConfig: (provider: string) => 
       ipcRenderer.invoke('model:removeConfig', provider),
+    setThinkingLevel: (sessionId: string, level: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh') => 
+      ipcRenderer.invoke('model:setThinkingLevel', sessionId, level),
+    getThinkingLevel: (sessionId: string) => 
+      ipcRenderer.invoke('model:getThinkingLevel', sessionId),
   },
 
   // 对话框
@@ -127,6 +135,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent:agent_end',
       'agent:turn_start',
       'agent:turn_end',
+      'agent:compaction',
       'message:update',
       'tool:start',
       'tool:end',

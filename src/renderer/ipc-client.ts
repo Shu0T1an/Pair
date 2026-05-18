@@ -1,4 +1,4 @@
-import type { SessionInfo, ProjectSessions, NotificationConfig, OverviewStats, McpServerConfig, McpServerStatus, McpToolInfo } from '@/shared/types';
+import type { SessionInfo, ProjectSessions, NotificationConfig, OverviewStats, McpServerConfig, McpServerStatus, McpToolInfo, MessageQueueType, MessageQueueStatus, ThinkingLevel, CompactionEvent } from '@/shared/types';
 
 // 事件数据类型定义
 export interface MessageStartEvent {
@@ -120,6 +120,8 @@ interface ElectronAPI {
   message: {
     send: (sessionId: string, text: string, modelConfig?: string | { provider: string; baseUrl: string; apiKey: string; modelId: string; modelName?: string; api?: string; contextWindow?: number }) => Promise<void>;
     abort: (sessionId: string) => Promise<void>;
+    sendQueued: (sessionId: string, text: string, type: 'steering' | 'follow-up') => Promise<{ success: boolean; error?: string }>;
+    getQueueStatus: (sessionId: string) => Promise<MessageQueueStatus>;
   };
 
   // 模型管理
@@ -132,6 +134,8 @@ interface ElectronAPI {
     removeApiKey: (provider: string) => Promise<void>;
     syncConfig: (config: { provider: string; baseUrl: string; apiKey: string; models: Array<{ id: string; name?: string }> }) => Promise<void>;
     removeConfig: (provider: string) => Promise<void>;
+    setThinkingLevel: (sessionId: string, level: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh') => Promise<{ success: boolean; error?: string }>;
+    getThinkingLevel: (sessionId: string) => Promise<'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'>;
   };
 
   // 通知配置
@@ -463,6 +467,63 @@ export class IPCClient {
       return { usedTokens: 0, totalTokens: 128000, percentage: 0 };
     }
     return window.electronAPI.context.usage(sessionId);
+  }
+
+  // ── 消息队列 ──
+
+  /**
+   * 发送队列消息
+   */
+  async sendQueuedMessage(sessionId: string, text: string, type: MessageQueueType): Promise<{ success: boolean; error?: string }> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，跳过发送队列消息');
+      return { success: false, error: '非 Electron 环境' };
+    }
+    return window.electronAPI.message.sendQueued(sessionId, text, type);
+  }
+
+  /**
+   * 获取队列状态
+   */
+  async getQueueStatus(sessionId: string): Promise<MessageQueueStatus> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，返回默认状态');
+      return { steeringCount: 0, followUpCount: 0, totalCount: 0, isAgentWorking: false };
+    }
+    return window.electronAPI.message.getQueueStatus(sessionId);
+  }
+
+  // ── Thinking 级别 ──
+
+  /**
+   * 设置 Thinking 级别
+   */
+  async setThinkingLevel(sessionId: string, level: ThinkingLevel): Promise<{ success: boolean; error?: string }> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，跳过设置 Thinking 级别');
+      return { success: false, error: '非 Electron 环境' };
+    }
+    return window.electronAPI.model.setThinkingLevel(sessionId, level);
+  }
+
+  /**
+   * 获取 Thinking 级别
+   */
+  async getThinkingLevel(sessionId: string): Promise<ThinkingLevel> {
+    if (!this.isElectron()) {
+      console.warn('非 Electron 环境，返回默认级别');
+      return 'medium';
+    }
+    return window.electronAPI.model.getThinkingLevel(sessionId);
+  }
+
+  // ── 压缩事件 ──
+
+  /**
+   * 监听压缩事件
+   */
+  onCompaction(callback: (data: CompactionEvent) => void): () => void {
+    return this.on('agent:compaction', callback);
   }
 
   /**

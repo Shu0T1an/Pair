@@ -4,7 +4,7 @@ import { StorageManager } from './storage-manager.js';
 import { NotificationManager } from './notification.js';
 import { searchProjectFiles, readFileContent } from './file-scanner.js';
 import { McpServerRegistry } from './mcp/mcp-server-registry.js';
-import type { SessionInfo, ProjectSessions, NotificationConfig, McpServerConfig } from '../shared/types.js';
+import type { SessionInfo, ProjectSessions, NotificationConfig, McpServerConfig, MessageQueueType, MessageQueueStatus, ThinkingLevel } from '../shared/types.js';
 import { DEFAULT_NOTIFICATION_CONFIG } from '../shared/types.js';
 
 export class IPCHandler {
@@ -147,6 +147,14 @@ export class IPCHandler {
     ipcMain.handle('mcp:getStatus', this.handleMcpGetStatus.bind(this));
     ipcMain.handle('mcp:getAllStatuses', this.handleMcpGetAllStatuses.bind(this));
     ipcMain.handle('mcp:getTools', this.handleMcpGetTools.bind(this));
+    
+    // 消息队列
+    ipcMain.handle('message:sendQueued', this.handleSendQueuedMessage.bind(this));
+    ipcMain.handle('message:getQueueStatus', this.handleGetQueueStatus.bind(this));
+    
+    // Thinking 级别
+    ipcMain.handle('model:setThinkingLevel', this.handleSetThinkingLevel.bind(this));
+    ipcMain.handle('model:getThinkingLevel', this.handleGetThinkingLevel.bind(this));
   }
 
   /**
@@ -280,6 +288,65 @@ export class IPCHandler {
     } catch (error) {
       console.error('中止消息失败:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 发送队列消息
+   */
+  private async handleSendQueuedMessage(
+    _event: any, 
+    sessionId: string, 
+    text: string, 
+    type: MessageQueueType
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.agentManager.sendQueuedMessage(sessionId, text, type);
+      return { success: true };
+    } catch (error) {
+      console.error('发送队列消息失败:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  /**
+   * 获取队列状态
+   */
+  private handleGetQueueStatus(_event: any, sessionId: string): MessageQueueStatus {
+    try {
+      return this.agentManager.getQueueStatus(sessionId);
+    } catch (error) {
+      console.error('获取队列状态失败:', error);
+      return { steeringCount: 0, followUpCount: 0, totalCount: 0, isAgentWorking: false };
+    }
+  }
+
+  /**
+   * 设置 Thinking 级别
+   */
+  private async handleSetThinkingLevel(
+    _event: any, 
+    sessionId: string, 
+    level: ThinkingLevel
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.agentManager.setThinkingLevel(sessionId, level);
+      return { success: true };
+    } catch (error) {
+      console.error('设置 Thinking 级别失败:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  /**
+   * 获取 Thinking 级别
+   */
+  private handleGetThinkingLevel(_event: any, sessionId: string): ThinkingLevel {
+    try {
+      return this.agentManager.getThinkingLevel(sessionId);
+    } catch (error) {
+      console.error('获取 Thinking 级别失败:', error);
+      return 'medium' as ThinkingLevel;
     }
   }
 
