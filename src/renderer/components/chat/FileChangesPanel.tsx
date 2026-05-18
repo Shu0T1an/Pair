@@ -4,9 +4,11 @@ import {
   FilePlus,
   ChevronDown,
   ChevronRight,
+  Maximize2,
 } from 'lucide-react'
 import { PatchDiff } from '@pierre/diffs/react'
 import { cn } from '@/renderer/lib/utils'
+import { DiffReviewModal } from '@/renderer/components/modals/DiffReviewModal'
 import type { ToolCall } from '@/shared/types'
 import { useTheme } from '@/renderer/contexts/ThemeContext'
 import {
@@ -35,6 +37,7 @@ interface FileChangesPanelProps {
 export function FileChangesPanel({ toolCalls, isStreaming, defaultExpanded = false, fontSize }: FileChangesPanelProps) {
   const [isListExpanded, setIsListExpanded] = useState(defaultExpanded)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const [reviewFile, setReviewFile] = useState<{ diff: string; filePath: string } | null>(null)
   const { isDark } = useTheme()
   const iconScale = fontSize ? fontSize / 14 : 1
   const s14 = Math.round(14 * iconScale)
@@ -128,44 +131,66 @@ export function FileChangesPanel({ toolCalls, isStreaming, defaultExpanded = fal
             const isSelected = selectedFile === file.filePath
             return (
               <div key={file.filePath}>
-                <button
-                  onClick={() => setSelectedFile(isSelected ? null : file.filePath)}
+                <div
                   className={cn(
                     'w-full flex items-center gap-2 py-1 transition-colors rounded',
                     'hover:bg-muted/50 px-1.5',
                     isSelected && 'bg-muted/50'
                   )}
                 >
-                  {file.type === 'write' ? (
-                    <FilePlus size={s14} className="text-purple-500 shrink-0" />
-                  ) : (
-                    <FileEdit size={s14} className="text-orange-500 shrink-0" />
-                  )}
-
-                  <span className="font-mono text-left truncate text-foreground">
-                    {file.filePath}
-                  </span>
-
-                  <span className="text-xs font-mono font-semibold shrink-0">
-                    <span className="text-emerald-600">+{file.additions}</span>
-                    {file.deletions > 0 && (
-                      <>
-                        <span className="text-muted-foreground mx-0.5">/</span>
-                        <span className="text-red-500">-{file.deletions}</span>
-                      </>
+                  <button
+                    onClick={() => setSelectedFile(isSelected ? null : file.filePath)}
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                  >
+                    {file.type === 'write' ? (
+                      <FilePlus size={s14} className="text-purple-500 shrink-0" />
+                    ) : (
+                      <FileEdit size={s14} className="text-orange-500 shrink-0" />
                     )}
-                  </span>
+
+                    <span className="font-mono truncate text-foreground">
+                      {file.filePath}
+                    </span>
+
+                    <span className="text-xs font-mono font-semibold shrink-0 ml-auto">
+                      <span className="text-emerald-600">+{file.additions}</span>
+                      {file.deletions > 0 && (
+                        <>
+                          <span className="text-muted-foreground mx-0.5">/</span>
+                          <span className="text-red-500">-{file.deletions}</span>
+                        </>
+                      )}
+                    </span>
+                  </button>
 
                   <span className="inline-block w-2 h-2 bg-blue-500 rounded-full shrink-0" />
 
-                  <ChevronRight
-                    size={s10}
-                    className={cn(
-                      'transition-transform text-muted-foreground shrink-0',
-                      isSelected && 'rotate-90'
-                    )}
-                  />
-                </button>
+                  {file.diff && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setReviewFile({ diff: file.diff, filePath: file.filePath })
+                      }}
+                      className="p-0.5 rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      title="全屏审阅"
+                    >
+                      <Maximize2 size={s10} />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setSelectedFile(isSelected ? null : file.filePath)}
+                    className="p-0.5 rounded hover:bg-muted-foreground/20 text-muted-foreground transition-colors shrink-0"
+                  >
+                    <ChevronRight
+                      size={s10}
+                      className={cn(
+                        'transition-transform',
+                        isSelected && 'rotate-90'
+                      )}
+                    />
+                  </button>
+                </div>
 
                 {isSelected && file.diff && (
                   <div className="ml-2 mt-1 mb-2">
@@ -186,6 +211,13 @@ export function FileChangesPanel({ toolCalls, isStreaming, defaultExpanded = fal
           })}
         </div>
       )}
+
+      <DiffReviewModal
+        isOpen={reviewFile !== null}
+        onClose={() => setReviewFile(null)}
+        diff={reviewFile?.diff ?? ''}
+        filePath={reviewFile?.filePath ?? ''}
+      />
     </div>
   )
 }
