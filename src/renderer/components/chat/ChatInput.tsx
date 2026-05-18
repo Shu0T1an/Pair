@@ -1,12 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ArrowUp, StopCircle, Mic, Paperclip, Brain } from 'lucide-react'
+import { ArrowUp, StopCircle, Mic, Paperclip, Brain, MessageSquare } from 'lucide-react'
 import { Button } from '@/renderer/components/ui/button'
 import { cn } from '@/renderer/lib/utils'
-import type { ModelInfo } from '@/shared/types'
+import type { ModelInfo, MessageQueueType, MessageQueueStatus } from '@/shared/types'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/renderer/components/ui/dropdown-menu'
 import { ipcClient } from '@/renderer/ipc-client'
 import { MentionPopup, type FileSearchItem } from './MentionPopup'
 import { CommandPopup, type SlashCommand } from './CommandPopup'
+import { QueueIndicator } from '@/renderer/components/ui/QueueIndicator'
 
 interface ChatInputProps {
   currentModel: ModelInfo | null
@@ -18,6 +19,8 @@ interface ChatInputProps {
   onSelectModel: (modelId: string) => void
   onOpenSettings?: () => void
   onNewSession?: () => void
+  onSendQueued?: (text: string, type: MessageQueueType) => void
+  queueStatus?: MessageQueueStatus
 }
 
 // 格式化 token 数量
@@ -41,6 +44,8 @@ export function ChatInput({
   onSelectModel,
   onOpenSettings,
   onNewSession,
+  onSendQueued,
+  queueStatus,
 }: ChatInputProps) {
   const [inputText, setInputText] = useState('')
   const [contextUsage, setContextUsage] = useState<{ usedTokens: number; totalTokens: number; percentage: number } | null>(null)
@@ -91,9 +96,15 @@ export function ChatInput({
   }, [sessionId]);
   
   // 消息发送后更新上下文使用情况
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback((type: MessageQueueType = 'steering') => {
     if (!inputText.trim() || isStreaming) return
-    onSend(inputText)
+    
+    if (onSendQueued) {
+      onSendQueued(inputText, type)
+    } else {
+      onSend(inputText)
+    }
+    
     setInputText('')
     
     // 重置 textarea 高度
@@ -112,7 +123,7 @@ export function ChatInput({
         }
       }
     }, 1000);
-  }, [inputText, isStreaming, onSend, sessionId])
+  }, [inputText, isStreaming, onSend, onSendQueued, sessionId])
   
   const commands: SlashCommand[] = [
     { name: 'settings', label: 'settings', description: '打开设置', handler: () => onOpenSettings?.() },
@@ -231,7 +242,13 @@ export function ChatInput({
       }
     } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
+      if (e.altKey) {
+        // Alt+Enter: 发送 follow-up 消息
+        handleSend('follow-up')
+      } else {
+        // Enter: 发送 steering 消息
+        handleSend('steering')
+      }
     }
   }, [mentionState, selectedIndex, resultCount, mentionResults, commands, handleFileSelect, handleCommandSelect, handleSend])
 
@@ -288,14 +305,18 @@ export function ChatInput({
               <StopCircle size={18} />
             </Button>
           ) : (
-            <Button 
-              size="icon" 
-              onClick={handleSend}
-              disabled={!inputText.trim()}
-              className="shrink-0"
-            >
-              <ArrowUp size={18} />
-            </Button>
+            <div className="flex gap-1">
+              {/* Steering 发送按钮 */}
+              <Button 
+                size="icon" 
+                onClick={() => handleSend('steering')}
+                disabled={!inputText.trim()}
+                className="shrink-0"
+                title="发送 Steering 消息 (Enter)"
+              >
+                <ArrowUp size={18} />
+              </Button>
+            </div>
           )}
         </div>
         
@@ -359,6 +380,11 @@ export function ChatInput({
               
               <span className="font-mono">{contextUsage.percentage}%</span>
             </div>
+          )}
+          
+          {/* 队列状态指示器 */}
+          {queueStatus && queueStatus.totalCount > 0 && (
+            <QueueIndicator status={queueStatus} />
           )}
           
           {/* 语音按钮 */}
