@@ -50,6 +50,7 @@ export class IPCHandler {
       'agent_end',
       'turn_start',
       'turn_end',
+      'compaction',
     ];
 
     // 为每个事件添加监听器

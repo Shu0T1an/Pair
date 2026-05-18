@@ -1188,6 +1188,16 @@ export class AgentManager extends EventEmitter {
             timestamp: new Date(),
           });
           break;
+          
+        case 'compaction':
+          this.emit('compaction', {
+            sessionId,
+            tokensBefore: event.tokensBefore,
+            tokensAfter: event.tokensAfter,
+            summary: event.summary,
+            timestamp: new Date(),
+          });
+          break;
       }
     });
 
