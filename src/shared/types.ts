@@ -271,8 +271,10 @@ export const DEFAULT_THINKING_BUDGETS: Record<ThinkingLevel, number> = {
 /** 压缩事件 */
 export interface CompactionEvent {
   sessionId: string
-  tokensBefore: number
-  tokensAfter: number
-  summary: string
+  tokensBefore?: number
+  tokensAfter?: number
+  summary?: string
+  aborted?: boolean
+  willRetry?: boolean
   timestamp: Date
 }
